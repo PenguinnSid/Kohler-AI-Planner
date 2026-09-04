@@ -12,7 +12,11 @@ Expected Outcome: An intelligent recommendation engine that outputs optimized pr
 
 https://www.kohler.co.in/content/dam/kohler-com-INDIA/Authored%20Content/PDF/PriceBook_July26.pdf
 
-Used the above product catalogue to extract product names, skus, prices, etc. for the major products (toilets, mirrors, basins, showers, bathtubs)
+Used the above product catalogue to extract product names, skus, prices, etc. for the major products (toilets, mirrors, basins, showers, bathtubs).
+
+## Flow Diagram
+
+![alt text](<docs/Flow diagram.png>)
 
 ## Project Structure
 ```text
