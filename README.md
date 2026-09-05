@@ -89,9 +89,9 @@ cd backend
 pip install -r requirements.txt
 ```
 
-API key
+API key - Add the gemini api key to the .env file
 ```bash
-Enter API key here
+GOOGLE_API_KEY=your_api_key_here
 ```
 
 Extracting the price book: Download the product catalogue from the link given above.
