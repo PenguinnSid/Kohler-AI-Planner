@@ -8,6 +8,17 @@ Objective: Build an interactive AI design assistant that takes a customer's cons
 Key Inputs: Bathroom dimensions (ft x ft / layout or image), budget limits, aesthetic themes (e.g., Minimalist Modern, Classic Luxury, Japanese Zen), and device catalog specifications.
 Expected Outcome: An intelligent recommendation engine that outputs optimized product combinations (faucets, smart toilets, thermostatic showers, vanities) fitting exact physical space and budget parameters. If possible a 2D or 3D representation of the bathroom layout with the selected products
 
+## Features
+
+#### Input based Design generation
+user enters room dimensions, budget, theme
+returns product bundles from the catalogue and generates a 2-D design
+
+#### Selective Browsing
+manually browse and select products
+auto complements items to form bundles and generates the 2-D design
+
+
 ## Catalogue Reference
 
 https://www.kohler.co.in/content/dam/kohler-com-INDIA/Authored%20Content/PDF/PriceBook_July26.pdf
@@ -71,3 +82,39 @@ kohler-bathroom-designer/
 
 ## How to run
 
+### Backend
+Setup
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+API key
+```bash
+Enter API key here
+```
+
+Extracting the price book: Download the product catalogue from the link given above.
+```bash
+cd backend
+python scripts/extract_catalog.py /path/to/PriceBook.pdf
+```
+
+Running the Backend
+```bash
+cd backend
+uvicorn app.main:app --reload
+```
+
+### Frontend
+
+Setup
+```bash
+cd frontend
+npm install
+```
+
+Running the Frontend
+```bash
+npm run dev
+```
