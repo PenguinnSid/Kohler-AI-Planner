@@ -23,47 +23,47 @@ Used the above product catalogue to extract product names, skus, prices, etc. fo
 kohler-bathroom-designer/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py                 # FastAPI app entrypoint
-│   │   ├── config.py                # env/settings
-│   │   ├── database.py              # Supabase/Postgres connection
-│   │   ├── models/                  # SQLAlchemy models
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── models/
 │   │   │   ├── __init__.py
 │   │   │   └── product.py
-│   │   ├── schemas/                 # Pydantic request/response shapes
+│   │   ├── schemas/
 │   │   │   ├── __init__.py
 │   │   │   ├── product.py
 │   │   │   └── design_request.py
-│   │   ├── routers/                 # API endpoints
+│   │   ├── routers/
 │   │   │   ├── __init__.py
-│   │   │   ├── products.py          # GET /products
-│   │   │   └── design.py            # POST /design → runs the full pipeline
-│   │   ├── services/                # the actual pipeline logic
+│   │   │   ├── products.py
+│   │   │   └── design.py
+│   │   ├── services/
 │   │   │   ├── __init__.py
-│   │   │   ├── catalog_filter.py    # stage 2: budget/style/fit filtering
-│   │   │   ├── ai_matcher.py        # stage 3: LLM matching + justification
-│   │   │   └── layout_generator.py  # stage 4b: 2D SVG placement
+│   │   │   ├── catalog_filter.py
+│   │   │   ├── ai_matcher.py
+│   │   │   ├── layout_generator.py
+│   │   │   ├── similarity.py
+│   │   │   └── seed.py
 │   │   └── data/
-│   │       └── catalog_seed.json    # your synthetic catalog
+│   │       └── catalog_seed.csv
 │   ├── scripts/
-│   │   └── seed_catalog.py          # loads catalog_seed.json into DB
-│   ├── alembic/                     # migrations, same as MentorOS
-│   ├── tests/
-│   │   └── test_matching.py
+│   │   └── seed_catalog.py
 │   ├── requirements.txt
-│   └── .env
+│   └── .env.example
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── components/
-│   │   │   ├── DesignForm.jsx       # stage 1: dimensions/budget/theme input
-│   │   │   ├── BundleResult.jsx     # stage 5a: recommended products
-│   │   │   └── LayoutViewer.jsx     # stage 5b: SVG room layout
+│   │   │   ├── DesignForm.jsx
+│   │   │   ├── BundleResult.jsx
+│   │   │   ├── LayoutViewer.jsx
+│   │   │   ├── CatalogBrowser.jsx
+│   │   │   └── SimilarItems.jsx
 │   │   └── api/
 │   │       └── client.js
 │   ├── package.json
 │   └── vite.config.js
 ├── docs/
-│   ├── prompts.md                   # running log → compiles into the required PDF
+│   ├── prompts.md
 │   └── architecture.md
 ├── README.md
 └── .gitignore
