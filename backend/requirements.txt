@@ -1,13 +1,8 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-sqlalchemy==2.0.35
-alembic==1.13.3
-pydantic==2.9.2
-pydantic-settings==2.5.2
-python-dotenv==1.0.1
-anthropic==0.34.2
-pdfplumber==0.11.4
-
-# Optional — only needed if you set DATABASE_URL to a Postgres/Supabase
-# connection string instead of the default local SQLite file:
-# psycopg2-binary==2.9.9
+cffi==2.1.1
+charset-normalizer==3.5.1
+cryptography==50.0.1
+pdfminer.six==20260107
+pdfplumber==0.11.10
+pillow==12.3.0
+pycparser==3.0
+pypdfium2==5.13.0

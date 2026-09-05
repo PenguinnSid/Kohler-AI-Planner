@@ -1,18 +1,27 @@
 """
-Extracts real product data (SKU, category, price, description) from the
-Kohler India Price Book PDF into app/data/catalog_seed.csv.
+File to extract product catalogue data from the PDF price book
 
-Usage (from backend/):
-    python scripts/extract_catalog.py /path/to/PriceBook.pdf
+Uses pdf plumber to extract text from the pdf and regex to parse the text into the required fields.
+
+Parses through the pdf and generates a csv file with the following fields:
+- sku_code
+- category
+- subcategory
+- collection
+- model_name
+- description
+- price_inr
+
 
 """
 import re
 import csv
 import sys
 import os
-import subprocess
+import pdfplumber
 
 # (category, start_page, end_page)
+
 CATEGORIES = [
     ("toilet", 4, 19),
     ("mirror", 20, 27),
@@ -22,19 +31,22 @@ CATEGORIES = [
     ("bathtub", 160, 163),
 ]
 
+# Permissive on the currency symbol between "MRP" and the price — it can
+# render as different characters (backtick, rupee glyph, etc.) depending
+# on the PDF's fonts and the pdfplumber/pdfminer version reading it.
 CODE_PRICE_RE = re.compile(
-    r'^(?P<desc>.*\S)\s{2,}(?P<code>K-[A-Za-z0-9\-]+)\s+MRP\s*`\s*(?P<price>[\d,]+\.\d{2})\s*$'
+    r'(?P<desc>.+?)\s+(?P<code>K-[A-Za-z0-9\-]+)\s+MRP\s*\S{0,3}\s*(?P<price>[\d,]+\.\d{2})'
 )
 
-MODEL_INDENT_THRESHOLD = 15
+MODEL_INDENT_THRESHOLD = 20
 
 
-def extract_page_range(pdf_path, start, end):
-    result = subprocess.run(
-        ["pdftotext", "-layout", "-f", str(start), "-l", str(end), pdf_path, "-"],
-        capture_output=True, text=True,
-    )
-    return result.stdout.split("\n")
+def extract_page_range(pdf, start, end):
+    lines = []
+    for page in pdf.pages[start - 1:end]:
+        text = page.extract_text(layout=True) or ""
+        lines.extend(text.split("\n"))
+    return lines
 
 
 def indentation(line):
@@ -43,7 +55,7 @@ def indentation(line):
 
 def is_model_candidate(line):
     stripped = line.strip()
-    if not stripped:
+    if not stripped or len(stripped) <= 2:
         return False
     if indentation(line) > MODEL_INDENT_THRESHOLD:
         return False
@@ -65,52 +77,55 @@ def extract(pdf_path):
     rows = []
     seen_codes = set()
 
-    for category, start, end in CATEGORIES:
-        lines = extract_page_range(pdf_path, start, end)
-        pending_model = None
+    with pdfplumber.open(pdf_path) as pdf:
+        for category, start, end in CATEGORIES:
+            lines = extract_page_range(pdf, start, end)
+            pending_model = None
 
-        for line in lines:
-            if not line.strip():
-                continue
-
-            match = CODE_PRICE_RE.match(line)
-            if match:
-                desc = match.group("desc").strip()
-                code = match.group("code").strip()
-                price_str = match.group("price").replace(",", "")
-                try:
-                    price = float(price_str)
-                except ValueError:
+            for line in lines:
+                if not line.strip():
                     continue
 
-                if code in seen_codes:
-                    continue
-                seen_codes.add(code)
+                match = CODE_PRICE_RE.search(line)
+                if match:
+                    desc = match.group("desc").strip()
+                    code = match.group("code").strip()
+                    price_str = match.group("price").replace(",", "")
+                    try:
+                        price = float(price_str)
+                    except ValueError:
+                        continue
 
-                model_name = pending_model or desc[:40].strip()
-                rows.append({
-                    "sku_code": code,
-                    "category": category,
-                    "subcategory": "",
-                    "collection": pending_model or "",
-                    "model_name": model_name,
-                    "description": desc,
-                    "price_inr": price,
-                    "style_tags": "",
-                    "width_in": "",
-                    "depth_in": "",
-                    "dimension_source": "unestimated",
-                })
-            elif is_model_candidate(line):
-                pending_model = line.strip()
+                    if code in seen_codes:
+                        continue
+                    seen_codes.add(code)
+
+                    model_name = pending_model or desc[:40].strip()
+                    rows.append({
+                        "sku_code": code,
+                        "category": category,
+                        "subcategory": "",
+                        "collection": pending_model or "",
+                        "model_name": model_name,
+                        "description": desc,
+                        "price_inr": price,
+                        "style_tags": "",
+                        "width_in": "",
+                        "depth_in": "",
+                        "dimension_source": "unestimated",
+                    })
+                elif is_model_candidate(line):
+                    pending_model = line.strip()
 
     return rows
 
 
 def clean_rows(rows):
+
     """Blank out model_name/collection where the layout heuristic likely
     picked up noise (merged columns, spec-table headers, etc.), and
     backfill model_name from the description so nothing ships garbled."""
+
     for r in rows:
         name = r["model_name"]
         if "incl of all taxes" in name.lower() or "   " in name or len(name) > 45:
