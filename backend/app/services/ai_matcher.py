@@ -1,9 +1,12 @@
 import os
 import json
-from anthropic import Anthropic
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from app.schemas.design_request import DesignRequest
 
-client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+load_dotenv()
+client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 MATCH_SYSTEM_PROMPT = """You are a bathroom design assistant. Given filtered
 candidate products per category and a customer's budget and aesthetic theme,
@@ -12,7 +15,7 @@ choose exactly one product per category that:
 2. Is stylistically coherent with the requested aesthetic theme
 3. Comes with a one-sentence justification for why it was picked
 
-Respond ONLY with valid JSON in this shape, no other text:
+Respond with JSON in this shape:
 {
   "selections": {
     "<category>": {"sku_code": "...", "justification": "..."}
@@ -50,12 +53,14 @@ Candidates:
 {json.dumps(candidate_summary, indent=2)}
 """
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=1000,
-        system=MATCH_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=MATCH_SYSTEM_PROMPT,
+            response_mime_type="application/json",
+            max_output_tokens=1000,
+        ),
     )
 
-    text = response.content[0].text
-    return json.loads(text)
+    return json.loads(response.text)
