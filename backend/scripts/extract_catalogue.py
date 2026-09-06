@@ -1,5 +1,5 @@
 """
-File to extract product catalogue data from the PDF price book
+File to extract product catalogue data from the PDF price book.
 
 Uses pdf plumber to extract text from the pdf and regex to parse the text into the required fields.
 
@@ -148,12 +148,12 @@ def write_csv(rows, out_path):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python scripts/extract_catalog.py /path/to/PriceBook.pdf")
+        print("Usage: python scripts/extract_catalogue.py /path/to/PriceBook.pdf")
         sys.exit(1)
 
     pdf_path = sys.argv[1]
     out_path = os.path.join(
-        os.path.dirname(__file__), "..", "app", "data", "catalog_seed.csv"
+        os.path.dirname(__file__), "..", "app", "data", "catalogue_seed.csv"
     )
 
     rows = extract(pdf_path)

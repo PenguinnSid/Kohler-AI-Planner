@@ -1,6 +1,6 @@
 """
 Loads app/data/catalogue_seed.csv into the products table (SQLite by default).
-Run from backend/: python scripts/seed_catalog.py
+Run from backend/: python scripts/seed_catalogue.py
 """
 import sys
 import os
