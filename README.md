@@ -9,6 +9,17 @@ Key Inputs: Bathroom dimensions (ft x ft / layout or image), budget limits, aest
 Expected Outcome: An intelligent recommendation engine that outputs optimized product combinations (faucets, smart toilets, thermostatic showers, vanities) fitting exact physical space and budget parameters. If possible a 2D or 3D representation of the bathroom layout with the selected products
 
 ## Project Description
+Interactive AI based bathroom design assistant.
+
+Accepts the following input parameters: 
+- Bathroom Dimensions
+- Bathroom layout image
+- Budget
+- Style/Theme
+
+Provides a product bundle with a customized combination of products from a catalogue book, matches to the user's requirements.
+Generates a 2-D representation of the layout with the above products.
+
 
 ## Features
 
@@ -57,9 +68,11 @@ kohler-bathroom-designer/
 │   │   │   ├── similarity.py
 │   │   │   └── seed.py
 │   │   └── data/
-│   │       └── catalog_seed.csv
+│   │       └── catalogue_seed.csv
 │   ├── scripts/
-│   │   └── seed_catalog.py
+│   │   ├── enrich_catalogue.py
+│   │   ├── extract_catalogue.py
+│   │   └── seed_catalogue.py
 │   ├── requirements.txt
 │   └── .env.example
 ├── frontend/
@@ -97,9 +110,16 @@ GOOGLE_API_KEY=your_api_key_here
 ```
 
 Extracting the price book: Download the product catalogue from the link given above.
+This updates the csv file with relevant product details from the product catalogue.
 ```bash
 cd backend
 python scripts/extract_catalog.py /path/to/PriceBook.pdf
+```
+
+Enrich the catalogue with missing product details
+```bash
+cd backend
+python scripts/enrich_catalogue.py
 ```
 
 Running the Backend
