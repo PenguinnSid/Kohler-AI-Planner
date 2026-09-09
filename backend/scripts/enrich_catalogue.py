@@ -26,7 +26,9 @@ load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "app", "data", "catalogue_seed.csv")
-BATCH_SIZE = 20
+BATCH_SIZE = 10
+MAX_RETRIES = 4
+BASE_DELAY_SECONDS = 4
 
 STYLE_VOCAB = [
     "minimalist", "modern", "classic", "luxury", "ornate",
@@ -78,6 +80,24 @@ def chunk(items, size):
         yield items[i:i + size]
 
 
+def call_gemini(user_prompt):
+    response = client.models.generate_content(
+        model="gemini-3.1-flash-lite",
+        contents=user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            response_mime_type="application/json",
+            max_output_tokens=4000,
+            # Silences the "automatic function calling" advisory notice —
+            # irrelevant here since this call defines no tools.
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=True
+            ),
+        ),
+    )
+    return json.loads(response.text)
+
+
 def enrich_batch(category, batch):
     hint = CATEGORY_DIMENSION_HINTS.get(category, "")
     payload = [
@@ -91,17 +111,18 @@ Products:
 {json.dumps(payload, indent=2)}
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            response_mime_type="application/json",
-            max_output_tokens=2000,
-        ),
-    )
+    last_error = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            return call_gemini(user_prompt)
+        except Exception as e:
+            last_error = e
+            if attempt < MAX_RETRIES:
+                delay = BASE_DELAY_SECONDS * (2 ** (attempt - 1))
+                print(f"    attempt {attempt} failed ({e}); retrying in {delay}s...")
+                time.sleep(delay)
 
-    return json.loads(response.text)
+    raise last_error
 
 
 def merge_enrichment(rows, enriched_batch):
@@ -138,7 +159,7 @@ def main():
                 merge_enrichment(rows, enriched)
                 write_rows(rows, fieldnames)  # save progress after every batch
             except Exception as e:
-                print(f"  Failed, skipping this batch: {e}")
+                print(f"  Failed after {MAX_RETRIES} attempts, skipping this batch: {e}")
             time.sleep(0.5)
 
     print("Done.")
