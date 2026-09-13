@@ -22,14 +22,14 @@ function ProductModelViewer({ objPath, category, modelName }) {
       loader.load(
         `${BASE_URL}/api/3d/${fileName}`,
         (object) => {
-          const isVeil = fileName.includes("20704") || fileName.includes("20703") || 
-                         (modelName && modelName.toLowerCase().includes("veil"));
+          const isVeil20704 = fileName.includes("20704");
+          const isVeil20703 = fileName.includes("20703");
 
-          if (isVeil) {
-            // Veil 20704 is natively Y-up. No X rotation, align long axis on Y
-            object.rotation.set(0, Math.PI / 2, 0);
+          if (isVeil20704) {
+            // Veil (20704, 48k): natural mid-point orientation (0 degrees)
+            object.rotation.set(0, 0, 0);
           } else {
-            // Standard CAD Z-up models (Reach, Span, etc.) rotate -90 deg on X
+            // 1st Veil (20703, 80k) & standard CAD Z-up models: rotate -90 deg on X to stand upright
             object.rotation.x = -Math.PI / 2;
           }
           object.updateMatrixWorld(true);
@@ -38,7 +38,7 @@ function ProductModelViewer({ objPath, category, modelName }) {
           let size = box.getSize(new THREE.Vector3());
 
           // Adjust alignment if length is depth-wise for other washbasins
-          if (!isVeil && category === 'washbasin' && size.x < size.z) {
+          if (!isVeil20704 && !isVeil20703 && category === 'washbasin' && size.x < size.z) {
             object.rotation.y += Math.PI / 2;
             object.updateMatrixWorld(true);
             box = new THREE.Box3().setFromObject(object);
@@ -116,17 +116,19 @@ export default function CatalogBrowser({ onSelect }) {
 
   const styles = {
     container: {
-      padding: "24px",
-      width: "100%",
-      boxSizing: "border-box",
+      padding: "32px 40px",
+      maxWidth: "1400px",
+      margin: "0 auto",
+      backgroundColor: "#0B132B",
+      color: "#F8FAFC",
     },
     headerRow: {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: "24px",
+      marginBottom: "28px",
+      borderBottom: `2px solid #1E293B`,
       paddingBottom: "16px",
-      borderBottom: `2px solid ${LIGHT_GRAY}`,
     },
     titleSection: {
       display: "flex",
@@ -134,31 +136,32 @@ export default function CatalogBrowser({ onSelect }) {
       gap: "12px",
     },
     title: {
-      fontSize: "1.4rem",
+      fontSize: "1.8rem",
       fontWeight: "700",
-      color: DARK_ORANGE,
-      margin: 0,
+      color: "#FFD166",
+      margin: "0",
     },
     subtitle: {
-      fontSize: "0.9rem",
-      color: "#666",
+      fontSize: "0.95rem",
+      color: "#94A3B8",
     },
     filterContainer: {
       display: "flex",
-      gap: "10px",
       alignItems: "center",
+      gap: "12px",
     },
     filterLabel: {
       fontSize: "0.9rem",
-      fontWeight: "600",
-      color: DARK_ORANGE,
+      fontWeight: "700",
+      color: "#FFD166",
     },
     select: {
       padding: "8px 14px",
-      border: `2px solid ${PEACH}`,
+      border: `1px solid #334155`,
       borderRadius: "6px",
       fontSize: "0.9rem",
-      backgroundColor: WHITE,
+      backgroundColor: "#0F172A",
+      color: "#F8FAFC",
       cursor: "pointer",
       fontFamily: "inherit",
       minWidth: "180px",
@@ -170,10 +173,10 @@ export default function CatalogBrowser({ onSelect }) {
       gap: "24px",
     },
     productCard: {
-      backgroundColor: WHITE,
-      border: `2px solid ${PEACH}`,
+      backgroundColor: "#1C2541",
+      border: `1px solid #334155`,
       borderRadius: "8px",
-      padding: "16px",
+      padding: "18px",
       transition: "all 0.2s ease",
       display: "flex",
       flexDirection: "column",
@@ -181,7 +184,7 @@ export default function CatalogBrowser({ onSelect }) {
     },
     productCardHover: {
       borderColor: ORANGE,
-      boxShadow: "0 6px 20px rgba(217, 126, 58, 0.15)",
+      boxShadow: "0 8px 24px rgba(0, 0, 0, 0.5)",
       transform: "translateY(-4px)",
     },
     modelViewer: {
@@ -189,7 +192,7 @@ export default function CatalogBrowser({ onSelect }) {
       marginBottom: "14px",
       borderRadius: "6px",
       overflow: "hidden",
-      backgroundColor: LIGHT_GRAY,
+      backgroundColor: "#0F172A",
     },
     cardContent: {
       display: "flex",
@@ -198,7 +201,7 @@ export default function CatalogBrowser({ onSelect }) {
     },
     productCategory: {
       fontSize: "0.75rem",
-      color: DARK_ORANGE,
+      color: "#FFD166",
       fontWeight: "700",
       marginBottom: "6px",
       textTransform: "uppercase",
@@ -207,7 +210,7 @@ export default function CatalogBrowser({ onSelect }) {
     productName: {
       fontSize: "1.05rem",
       fontWeight: "600",
-      color: "#222",
+      color: "#F8FAFC",
       marginBottom: "8px",
       lineHeight: "1.3",
     },
@@ -226,7 +229,7 @@ export default function CatalogBrowser({ onSelect }) {
       border: "none",
       borderRadius: "6px",
       cursor: "pointer",
-      fontWeight: "600",
+      fontWeight: "700",
       fontSize: "0.9rem",
       transition: "all 0.2s ease",
     },
@@ -236,8 +239,8 @@ export default function CatalogBrowser({ onSelect }) {
     emptyState: {
       textAlign: "center",
       padding: "60px 20px",
-      color: "#888",
-      fontSize: "1rem",
+      color: "#94A3B8",
+      fontSize: "1.05rem",
     },
   };
 

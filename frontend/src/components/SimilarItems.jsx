@@ -28,19 +28,21 @@ export default function SimilarItems({ skuCode }) {
     emptyState: {
       padding: "24px",
       textAlign: "center",
-      color: "#999",
+      color: "#94A3B8",
     },
     heading: {
-      color: DARK_ORANGE,
+      color: "#FFD166",
       marginBottom: "20px",
+      fontSize: "1.4rem",
+      fontWeight: "700",
     },
     categorySection: {
       marginBottom: "24px",
     },
     categoryTitle: {
       fontSize: "1.1rem",
-      fontWeight: "600",
-      color: DARK_ORANGE,
+      fontWeight: "700",
+      color: "#FFD166",
       marginBottom: "12px",
       textTransform: "uppercase",
     },
@@ -50,20 +52,20 @@ export default function SimilarItems({ skuCode }) {
       gap: "12px",
     },
     itemCard: {
-      backgroundColor: WHITE,
-      border: `2px solid ${PEACH}`,
+      backgroundColor: "#1C2541",
+      border: `1px solid #334155`,
       borderRadius: "6px",
-      padding: "12px",
+      padding: "14px",
       transition: "all 0.2s ease",
     },
     itemCardHover: {
       borderColor: ORANGE,
-      boxShadow: "0 2px 8px rgba(217, 126, 58, 0.15)",
+      boxShadow: "0 6px 16px rgba(0, 0, 0, 0.4)",
     },
     itemName: {
       fontSize: "0.95rem",
       fontWeight: "600",
-      color: "#333",
+      color: "#F8FAFC",
       marginBottom: "4px",
     },
     itemPrice: {
@@ -73,9 +75,10 @@ export default function SimilarItems({ skuCode }) {
     },
     emptyCategory: {
       padding: "12px",
-      backgroundColor: "#f0f0f0",
+      backgroundColor: "#0F172A",
+      border: "1px solid #334155",
       borderRadius: "6px",
-      color: "#999",
+      color: "#94A3B8",
       fontSize: "0.9rem",
     },
   };

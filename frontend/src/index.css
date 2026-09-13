@@ -11,8 +11,8 @@ html, body, #root {
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #FFFFFF;
-  color: #333;
+  background-color: #0B132B;
+  color: #F8FAFC;
 }
 
 #root {
@@ -27,7 +27,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #F5F5F5;
+  background: #1C2541;
 }
 
 ::-webkit-scrollbar-thumb {

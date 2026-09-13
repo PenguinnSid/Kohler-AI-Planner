@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, Component } from "react";
 import DesignForm from "./components/DesignForm";
 import BundleResult from "./components/BundleResult";
 import LayoutViewer3D from "./components/LayoutViewer3D";
@@ -11,6 +11,41 @@ const ORANGE = "#D97E3A";
 const DARK_ORANGE = "#B86A2A";
 const WHITE = "#FFFFFF";
 const LIGHT_GRAY = "#F5F5F5";
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "40px", color: "#FF6B6B", backgroundColor: "#0F172A", height: "100%" }}>
+          <h3 style={{ margin: "0 0 12px 0", color: "#D97E3A" }}>Error Displaying 3D Scene</h3>
+          <pre style={{ color: "#F8FAFC", backgroundColor: "#1E293B", padding: "16px", borderRadius: "8px", overflowX: "auto" }}>
+            {this.state.error?.toString()}
+          </pre>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            style={{ padding: "10px 20px", backgroundColor: "#D97E3A", color: "#FFF", border: "none", borderRadius: "6px", cursor: "pointer", marginTop: "16px" }}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [mode, setMode] = useState("generate");
@@ -43,14 +78,15 @@ export default function App() {
       display: "flex",
       flexDirection: "column",
       minHeight: "100vh",
-      backgroundColor: WHITE,
+      backgroundColor: "#0B132B",
+      color: "#F8FAFC",
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
     },
     header: {
       backgroundColor: ORANGE,
       color: WHITE,
       padding: "24px 40px",
-      boxShadow: "0 4px 12px rgba(217, 126, 58, 0.2)",
+      boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)",
       flex: "0 0 auto",
     },
     headerTitle: {
@@ -69,57 +105,60 @@ export default function App() {
       display: "flex",
       flex: "1",
       overflow: "hidden",
+      backgroundColor: "#0B132B",
     },
     leftPanel: {
-      width: "400px",
-      borderRight: `2px solid ${LIGHT_GRAY}`,
+      width: "420px",
+      borderRight: `2px solid #1E293B`,
       overflowY: "auto",
-      padding: "40px 24px",
-      backgroundColor: WHITE,
+      padding: "32px 24px",
+      backgroundColor: "#1C2541",
     },
     mainViewer: {
       flex: "1",
       display: "flex",
       flexDirection: "column",
       overflow: "hidden",
+      backgroundColor: "#0B132B",
     },
     fullWidthContainer: {
       flex: "1",
       overflowY: "auto",
-      backgroundColor: WHITE,
+      backgroundColor: "#0B132B",
     },
     section: {
       marginBottom: "32px",
     },
     sectionTitle: {
       fontSize: "1.1rem",
-      fontWeight: "600",
-      color: DARK_ORANGE,
+      fontWeight: "700",
+      color: "#FFD166",
       marginBottom: "16px",
       margin: "0 0 16px 0",
     },
     loadingBox: {
       padding: "16px",
-      backgroundColor: PEACH,
+      backgroundColor: "rgba(217, 126, 58, 0.2)",
       borderRadius: "8px",
-      color: DARK_ORANGE,
-      fontWeight: "500",
+      border: `1px solid ${ORANGE}`,
+      color: "#FFD166",
+      fontWeight: "600",
       textAlign: "center",
     },
     tabs: {
       display: "flex",
       gap: "0",
-      borderBottom: `2px solid ${LIGHT_GRAY}`,
-      backgroundColor: LIGHT_GRAY,
+      borderBottom: `2px solid #1E293B`,
+      backgroundColor: "#1C2541",
     },
     tabButton: (active) => ({
-      padding: "12px 24px",
+      padding: "14px 28px",
       border: "none",
-      background: active ? WHITE : "none",
+      background: active ? "#0B132B" : "none",
       cursor: "pointer",
       fontSize: "0.95rem",
-      fontWeight: active ? "600" : "500",
-      color: active ? ORANGE : "#666",
+      fontWeight: active ? "700" : "500",
+      color: active ? "#FFD166" : "#94A3B8",
       borderBottom: active ? `3px solid ${ORANGE}` : "none",
       marginBottom: active ? "-2px" : "-2px",
       transition: "all 0.2s ease",
@@ -131,7 +170,7 @@ export default function App() {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      backgroundColor: "rgba(0, 0, 0, 0.75)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -139,21 +178,23 @@ export default function App() {
       padding: "20px",
     },
     modalContent: {
-      backgroundColor: WHITE,
+      backgroundColor: "#1C2541",
+      color: "#F8FAFC",
       borderRadius: "8px",
+      border: "1px solid #334155",
       padding: "32px",
       maxWidth: "800px",
       width: "90%",
       maxHeight: "85vh",
       overflowY: "auto",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.6)",
       position: "relative",
     },
     closeButton: {
       position: "absolute",
       top: "16px",
       right: "16px",
-      backgroundColor: LIGHT_GRAY,
+      backgroundColor: "#334155",
       border: "none",
       borderRadius: "50%",
       width: "32px",
@@ -161,7 +202,7 @@ export default function App() {
       cursor: "pointer",
       fontWeight: "700",
       fontSize: "1rem",
-      color: "#666",
+      color: "#F8FAFC",
     },
   };
 
@@ -249,7 +290,7 @@ export default function App() {
                       fontWeight: "600",
                     }}
                   >
-                    Close
+                    Close Specs
                   </button>
                 </div>
               )}
@@ -264,12 +305,15 @@ export default function App() {
               )}
 
               {result && result.layout && (
-                <LayoutViewer3D
-                  layoutData={result.layout}
-                  roomWidth={result.room_width_ft}
-                  roomDepth={result.room_depth_ft}
-                  onProductClick={setSelectedProduct}
-                />
+                <ErrorBoundary>
+                  <LayoutViewer3D
+                    layoutData={result.layout}
+                    roomWidth={result.room_width_ft}
+                    roomDepth={result.room_depth_ft}
+                    aestheticTheme={formData?.aesthetic_theme || "Minimalist Modern"}
+                    onProductClick={setSelectedProduct}
+                  />
+                </ErrorBoundary>
               )}
 
               {!result && !loading && (
