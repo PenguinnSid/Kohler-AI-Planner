@@ -28,8 +28,8 @@ def get_complementary_items(db: Session, anchor_sku: str, limit_per_category: in
         for p in candidates:
             p_tags = set(p.style_tags or [])
             tag_overlap = len(anchor_tags & p_tags)
-            collection_bonus = 1 if (p.collection and p.collection == anchor.collection) else 0
-            score = tag_overlap + collection_bonus
+            model_bonus = 1 if (getattr(p, 'model_name', None) and p.model_name == anchor.model_name) else 0
+            score = tag_overlap + model_bonus
             if score > 0:
                 scored.append((score, p))
         scored.sort(key=lambda x: x[0], reverse=True)
