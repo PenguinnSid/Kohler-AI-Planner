@@ -1,153 +1,216 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 
 const DARK_ORANGE = "#B86A2A";
 const PEACH = "#E8B4A0";
 
-// Color mapping for product categories
 const CATEGORY_COLORS = {
-  toilet: "#e74c3c",      // red
-  washbasin: "#3498db",   // blue
-  faucet: "#2ecc71",      // green
-  shower: "#9b59b6",      // purple
-  bathtub: "#f39c12",     // orange
-  mirror: "#1abc9c",      // teal
+  toilet: 0xe74c3c,
+  washbasin: 0x3498db,
+  faucet: 0x2ecc71,
+  shower: 0x9b59b6,
+  bathtub: 0xf39c12,
+  mirror: 0x1abc9c,
 };
 
 function Floor({ width, depth }) {
-  // Convert inches to Three.js units (1 inch ≈ 1 unit for simplicity)
-  // We'll render at scale where floor is slightly larger than room for visibility
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, 0, depth / 2]}>
-      <planeGeometry args={[width + 24, depth + 24]} />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, 0, depth / 2]} receiveShadow>
+      <planeGeometry args={[width + 48, depth + 48]} />
       <meshStandardMaterial color="#e8e8e8" />
     </mesh>
   );
 }
 
-function Product({ placement }) {
+function Product({ placement, onClick }) {
   const { x, y, width_in, depth_in, model_name, category } = placement;
-  const color = CATEGORY_COLORS[category] || "#95a5a6";
+  const color = CATEGORY_COLORS[category] || 0x95a5a6;
 
-  // Convert to Three.js coordinates (y is height in 3D, z is depth in floor plane)
-  // Position at center of the fixture's footprint
   const centerX = x + width_in / 2;
   const centerZ = y + depth_in / 2;
+  const height = 18;
 
-  // Height of the fixture (arbitrary but reasonable)
-  const height = 18; // ~1.5 feet
+  const meshRef = useRef();
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    onClick({ ...placement, color });
+  };
 
   return (
-    <group>
-      {/* Main fixture box */}
-      <mesh position={[centerX, height / 2, centerZ]}>
+    <group onClick={handleClick}>
+      {/* Main fixture */}
+      <mesh
+        ref={meshRef}
+        position={[centerX, height / 2, centerZ]}
+        castShadow
+        receiveShadow
+      >
         <boxGeometry args={[width_in, height, depth_in]} />
         <meshStandardMaterial color={color} />
       </mesh>
 
-      {/* Label above the fixture */}
-      <Text position={[centerX, height + 12, centerZ]} fontSize={4} color="black" anchorY="bottom">
+      {/* Click marker - subtle white dot */}
+      <mesh position={[centerX, height + 8, centerZ]}>
+        <sphereGeometry args={[1.5, 16, 16]} />
+        <meshStandardMaterial
+          color={0xffffff}
+          emissive={0xffffff}
+          emissiveIntensity={0.4}
+        />
+      </mesh>
+
+      {/* Label */}
+      <Text
+        position={[centerX, height + 16, centerZ]}
+        fontSize={3}
+        color="black"
+        anchorY="bottom"
+        maxWidth={width_in + 10}
+      >
         {model_name}
       </Text>
     </group>
   );
 }
 
-export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth }) {
-  console.log("LayoutViewer3D rendered with:", { layoutData, roomWidth, roomDepth });
-  
+function CameraController() {
+  const { camera } = useThree();
+  const keysPressed = useRef({});
+  const moveSpeed = 0.5;
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      keysPressed.current[e.key.toLowerCase()] = true;
+    };
+    const handleKeyUp = (e) => {
+      keysPressed.current[e.key.toLowerCase()] = false;
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  useFrame(() => {
+    const keys = keysPressed.current;
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+
+    if (keys["w"]) camera.position.addScaledVector(forward, moveSpeed);
+    if (keys["s"]) camera.position.addScaledVector(forward, -moveSpeed);
+    if (keys["a"]) camera.position.addScaledVector(right, -moveSpeed);
+    if (keys["d"]) camera.position.addScaledVector(right, moveSpeed);
+    if (keys["arrowup"] || keys[" "]) camera.position.y += moveSpeed;
+    if (keys["arrowdown"]) camera.position.y -= moveSpeed;
+  });
+
+  return null;
+}
+
+export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, onProductClick }) {
+  const [hoveredProduct, setHoveredProduct] = useState(null);
+
   if (!layoutData || layoutData.length === 0) {
-    return <div style={{ textAlign: "center", padding: "20px", color: "#999" }}>No layout data available</div>;
+    return (
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100%",
+        color: "#999",
+      }}>
+        No layout data available
+      </div>
+    );
   }
 
-  // Convert feet to inches for rendering
   const roomWidthIn = roomWidth * 12;
   const roomDepthIn = roomDepth * 12;
 
   const styles = {
     container: {
+      display: "flex",
+      flexDirection: "column",
+      height: "100%",
       width: "100%",
-      height: 600,
-      border: `2px solid ${PEACH}`,
-      borderRadius: "8px",
-      overflow: "hidden",
-      marginTop: 12,
     },
-    legend: {
-      marginTop: 16,
-      padding: 16,
+    canvas: {
+      flex: 1,
+      width: "100%",
+    },
+    controls: {
+      padding: "16px 24px",
       backgroundColor: "#F5F5F5",
-      borderRadius: "6px",
-    },
-    legendTitle: {
-      fontWeight: "600",
-      color: DARK_ORANGE,
-      marginBottom: "12px",
-      fontSize: "0.95rem",
-    },
-    legendGrid: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 16,
-    },
-    legendItem: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-    },
-    legendColor: {
-      width: 16,
-      height: 16,
-      borderRadius: 2,
-    },
-    legendLabel: {
-      fontSize: "0.9rem",
+      borderTop: `2px solid ${PEACH}`,
+      fontSize: "0.85rem",
       color: "#666",
-      textTransform: "capitalize",
+    },
+    controlsText: {
+      margin: "0",
+      lineHeight: "1.6",
     },
   };
 
   return (
-    <div>
-      <div style={styles.container}>
-        <Canvas 
-          camera={{ position: [roomWidthIn / 2, 80, roomDepthIn + 50], fov: 50 }}
-          onCreated={() => console.log("Canvas initialized")}
-        >
-          {/* Lighting */}
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[roomWidthIn / 2, 100, 0]} intensity={0.8} />
+    <div style={styles.container}>
+      <Canvas
+        style={styles.canvas}
+        camera={{
+          position: [roomWidthIn / 2, 60, roomDepthIn + 40],
+          fov: 60,
+        }}
+        shadows
+      >
+        {/* Lighting */}
+        <ambientLight intensity={0.7} />
+        <directionalLight
+          position={[roomWidthIn / 2, 120, 0]}
+          intensity={0.8}
+          castShadow
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+        />
 
-          {/* Scene */}
-          <Floor width={roomWidthIn} depth={roomDepthIn} />
+        {/* Scene */}
+        <Floor width={roomWidthIn} depth={roomDepthIn} />
 
-          {/* Products */}
-          {layoutData.map((placement, idx) => (
-            <Product key={idx} placement={placement} />
-          ))}
+        {/* Products */}
+        {layoutData.map((placement, idx) => (
+          <Product
+            key={idx}
+            placement={placement}
+            onClick={(product) => {
+              setHoveredProduct(product);
+              onProductClick?.(product);
+            }}
+          />
+        ))}
 
-          {/* Controls */}
-          <OrbitControls />
-        </Canvas>
-      </div>
+        {/* Camera Controller */}
+        <CameraController />
 
-      {/* Legend */}
-      <div style={styles.legend}>
-        <div style={styles.legendTitle}>🎨 Category Colors</div>
-        <div style={styles.legendGrid}>
-          {Object.entries(CATEGORY_COLORS).map(([category, color]) => (
-            <div key={category} style={styles.legendItem}>
-              <div
-                style={{
-                  ...styles.legendColor,
-                  backgroundColor: color,
-                }}
-              />
-              <span style={styles.legendLabel}>{category}</span>
-            </div>
-          ))}
-        </div>
+        {/* Controls */}
+        <OrbitControls
+          makeDefault
+          autoRotate={false}
+          autoRotateSpeed={0}
+          dampingFactor={0.05}
+          enableDamping
+        />
+      </Canvas>
+
+      {/* Controls Info */}
+      <div style={styles.controls}>
+        <p style={styles.controlsText}>
+          <strong>🎮 Controls:</strong> Scroll to zoom • Mouse drag to rotate • W/A/S/D to move • Space/↓ to move up/down • Click on fixtures to inspect
+        </p>
       </div>
     </div>
   );

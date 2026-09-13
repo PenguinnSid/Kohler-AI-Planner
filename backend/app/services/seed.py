@@ -3,7 +3,7 @@ import os
 
 from app.models.product import Product
 
-SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "catalog_seed.csv")
+SEED_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "catalogue_seed.csv")
 
 
 def seed_from_csv(db) -> int:

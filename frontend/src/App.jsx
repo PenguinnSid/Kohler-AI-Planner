@@ -17,12 +17,20 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedSku, setSelectedSku] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [formData, setFormData] = useState({
+    room_width_ft: 8,
+    room_depth_ft: 6,
+    budget_inr: 200000,
+    aesthetic_theme: "Minimalist Modern",
+  });
 
-  const handleSubmit = async (formData) => {
+  const handleSubmit = async (data) => {
+    setFormData(data);
     setLoading(true);
     try {
-      const data = await createDesign(formData);
-      setResult(data);
+      const res = await createDesign(data);
+      setResult(res);
     } catch (error) {
       alert("Error: " + error.message);
     } finally {
@@ -31,7 +39,9 @@ export default function App() {
   };
 
   const styles = {
-    container: {
+    app: {
+      display: "flex",
+      flexDirection: "column",
       minHeight: "100vh",
       backgroundColor: WHITE,
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
@@ -39,141 +49,211 @@ export default function App() {
     header: {
       backgroundColor: ORANGE,
       color: WHITE,
-      padding: "40px 20px",
-      textAlign: "center",
-      boxShadow: "0 2px 8px rgba(217, 126, 58, 0.15)",
+      padding: "24px 40px",
+      boxShadow: "0 4px 12px rgba(217, 126, 58, 0.2)",
+      flex: "0 0 auto",
     },
     headerTitle: {
-      fontSize: "2.5rem",
-      fontWeight: "600",
+      fontSize: "2rem",
+      fontWeight: "700",
       margin: "0",
       letterSpacing: "0.5px",
     },
     headerSubtitle: {
-      fontSize: "1rem",
-      margin: "8px 0 0 0",
+      fontSize: "0.9rem",
+      margin: "6px 0 0 0",
       opacity: 0.95,
       fontWeight: "300",
     },
-    content: {
-      maxWidth: "1200px",
-      margin: "0 auto",
-      padding: "40px 20px",
-    },
-    tabs: {
+    body: {
       display: "flex",
-      gap: "12px",
-      marginBottom: "40px",
-      borderBottom: `2px solid ${LIGHT_GRAY}`,
+      flex: "1",
+      overflow: "hidden",
     },
-    tabButton: (active) => ({
-      padding: "12px 24px",
-      border: "none",
-      background: "none",
-      cursor: "pointer",
-      fontSize: "1rem",
-      fontWeight: active ? "600" : "500",
-      color: active ? ORANGE : "#666",
-      borderBottom: active ? `3px solid ${ORANGE}` : "none",
-      marginBottom: "-2px",
-      transition: "all 0.2s ease",
-    }),
+    leftPanel: {
+      width: "400px",
+      borderRight: `2px solid ${LIGHT_GRAY}`,
+      overflowY: "auto",
+      padding: "40px 24px",
+      backgroundColor: WHITE,
+    },
+    mainViewer: {
+      flex: "1",
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    },
     section: {
-      backgroundColor: LIGHT_GRAY,
-      borderRadius: "12px",
-      padding: "32px",
-      marginBottom: "24px",
+      marginBottom: "32px",
+    },
+    sectionTitle: {
+      fontSize: "1.1rem",
+      fontWeight: "600",
+      color: DARK_ORANGE,
+      marginBottom: "16px",
+      margin: "0 0 16px 0",
     },
     loadingBox: {
-      padding: "24px",
+      padding: "16px",
       backgroundColor: PEACH,
       borderRadius: "8px",
       color: DARK_ORANGE,
       fontWeight: "500",
-      marginBottom: "24px",
+      textAlign: "center",
     },
+    tabs: {
+      display: "flex",
+      gap: "0",
+      borderBottom: `2px solid ${LIGHT_GRAY}`,
+      backgroundColor: LIGHT_GRAY,
+    },
+    tabButton: (active) => ({
+      padding: "12px 20px",
+      border: "none",
+      background: active ? WHITE : "none",
+      cursor: "pointer",
+      fontSize: "0.95rem",
+      fontWeight: active ? "600" : "500",
+      color: active ? ORANGE : "#666",
+      borderBottom: active ? `3px solid ${ORANGE}` : "none",
+      marginBottom: active ? "-2px" : "-2px",
+      transition: "all 0.2s ease",
+      flex: "0 1 auto",
+    }),
   };
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
+    <div style={styles.app}>
+      {/* Header - Full Width */}
       <div style={styles.header}>
         <h1 style={styles.headerTitle}>✨ Kohler AI Bathroom Designer</h1>
-        <p style={styles.headerSubtitle}>Create your perfect bathroom with AI-powered design recommendations</p>
+        <p style={styles.headerSubtitle}>Interactive 3D bathroom design with AI-powered recommendations</p>
       </div>
 
-      {/* Main Content */}
-      <div style={styles.content}>
-        {/* Tabs */}
-        <div style={styles.tabs}>
-          <button
-            style={styles.tabButton(mode === "generate")}
-            onClick={() => {
-              setMode("generate");
-              setSelectedSku(null);
-            }}
-          >
-            🎨 Generate Design
-          </button>
-          <button
-            style={styles.tabButton(mode === "browse")}
-            onClick={() => {
-              setMode("browse");
-              setResult(null);
-            }}
-          >
-            🔍 Browse Catalogue
-          </button>
-        </div>
+      {/* Tabs */}
+      <div style={styles.tabs}>
+        <button
+          style={styles.tabButton(mode === "generate")}
+          onClick={() => {
+            setMode("generate");
+            setSelectedSku(null);
+          }}
+        >
+          🎨 Generate Design
+        </button>
+        <button
+          style={styles.tabButton(mode === "browse")}
+          onClick={() => {
+            setMode("browse");
+            setResult(null);
+          }}
+        >
+          🔍 Browse Catalogue
+        </button>
+      </div>
 
-        {/* Generate Mode */}
-        {mode === "generate" && (
-          <>
+      {/* Main Body */}
+      <div style={styles.body}>
+        {/* Left Panel - Form & Info */}
+        <div style={styles.leftPanel}>
+          {mode === "generate" && (
             <div style={styles.section}>
-              <h2 style={{ margin: "0 0 20px 0", color: DARK_ORANGE }}>Design Parameters</h2>
+              <h3 style={styles.sectionTitle}>Design Parameters</h3>
               <DesignForm onSubmit={handleSubmit} />
             </div>
-            
-            {loading && (
-              <div style={styles.loadingBox}>
-                ⏳ Generating your design... This may take a moment.
-              </div>
-            )}
-            
-            {result && !loading && (
-              <>
-                <div style={styles.section}>
-                  <BundleResult bundle={result.bundle} />
-                </div>
-                <div style={styles.section}>
-                  <h2 style={{ margin: "0 0 20px 0", color: DARK_ORANGE }}>3D Layout Preview</h2>
-                  <LayoutViewer3D 
-                    layoutData={result.layout} 
-                    roomWidth={result.room_width_ft}
-                    roomDepth={result.room_depth_ft}
-                  />
-                </div>
-              </>
-            )}
-          </>
-        )}
+          )}
 
-        {/* Browse Mode */}
-        {mode === "browse" && (
-          <>
+          {mode === "browse" && (
             <div style={styles.section}>
-              <h2 style={{ margin: "0 0 20px 0", color: DARK_ORANGE }}>Browse Products</h2>
+              <h3 style={styles.sectionTitle}>Browse Products</h3>
               <CatalogBrowser onSelect={setSelectedSku} />
             </div>
-            
-            {selectedSku && (
-              <div style={styles.section}>
-                <h2 style={{ margin: "0 0 20px 0", color: DARK_ORANGE }}>Matching Items</h2>
-                <SimilarItems skuCode={selectedSku} />
+          )}
+
+          {result && result.bundle && (
+            <div style={styles.section}>
+              <h3 style={styles.sectionTitle}>Recommended Bundle</h3>
+              <BundleResult bundle={result.bundle} />
+            </div>
+          )}
+
+          {selectedSku && (
+            <div style={styles.section}>
+              <h3 style={styles.sectionTitle}>Matching Items</h3>
+              <SimilarItems skuCode={selectedSku} />
+            </div>
+          )}
+
+          {selectedProduct && (
+            <div style={{
+              backgroundColor: LIGHT_GRAY,
+              padding: "20px",
+              borderRadius: "8px",
+              marginBottom: "20px",
+            }}>
+              <h4 style={{ margin: "0 0 12px 0", color: DARK_ORANGE }}>
+                📦 {selectedProduct.model_name}
+              </h4>
+              <div style={{ fontSize: "0.9rem", color: "#666", lineHeight: "1.6" }}>
+                <div><strong>Category:</strong> {selectedProduct.category}</div>
+                <div><strong>Price:</strong> ₹ {selectedProduct.price_inr?.toLocaleString('en-IN')}</div>
+                {selectedProduct.width_in && <div><strong>Width:</strong> {selectedProduct.width_in}"</div>}
+                {selectedProduct.depth_in && <div><strong>Depth:</strong> {selectedProduct.depth_in}"</div>}
+                {selectedProduct.collection && <div><strong>Collection:</strong> {selectedProduct.collection}</div>}
+                {selectedProduct.style_tags && (
+                  <div><strong>Style:</strong> {selectedProduct.style_tags.join(", ")}</div>
+                )}
               </div>
-            )}
-          </>
-        )}
+              <button
+                onClick={() => setSelectedProduct(null)}
+                style={{
+                  marginTop: "12px",
+                  padding: "8px 12px",
+                  backgroundColor: ORANGE,
+                  color: WHITE,
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontWeight: "600",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right Panel - 3D Viewer */}
+        <div style={styles.mainViewer}>
+          {loading && (
+            <div style={{ ...styles.loadingBox, margin: "40px", alignSelf: "center" }}>
+              ⏳ Generating your design... Please wait.
+            </div>
+          )}
+
+          {result && result.layout && (
+            <LayoutViewer3D
+              layoutData={result.layout}
+              roomWidth={result.room_width_ft}
+              roomDepth={result.room_depth_ft}
+              onProductClick={setSelectedProduct}
+            />
+          )}
+
+          {!result && mode === "generate" && !loading && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              color: "#999",
+              fontSize: "1.1rem",
+            }}>
+              Enter your room dimensions and click Generate to see the 3D layout
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

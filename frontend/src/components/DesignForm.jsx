@@ -29,25 +29,25 @@ export default function DesignForm({ onSubmit }) {
   const styles = {
     form: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-      gap: "24px",
-      marginBottom: "24px",
+      gridTemplateColumns: "1fr",
+      gap: "16px",
+      marginBottom: "16px",
     },
     formGroup: {
       display: "flex",
       flexDirection: "column",
-      gap: "8px",
+      gap: "6px",
     },
     label: {
-      fontSize: "0.95rem",
+      fontSize: "0.85rem",
       fontWeight: "600",
       color: DARK_ORANGE,
     },
     input: {
-      padding: "12px",
+      padding: "8px 10px",
       border: `2px solid ${PEACH}`,
-      borderRadius: "6px",
-      fontSize: "1rem",
+      borderRadius: "4px",
+      fontSize: "0.9rem",
       transition: "border-color 0.2s ease",
       fontFamily: "inherit",
     },
@@ -57,39 +57,39 @@ export default function DesignForm({ onSubmit }) {
       boxShadow: `0 0 0 3px rgba(217, 126, 58, 0.1)`,
     },
     select: {
-      padding: "12px",
+      padding: "8px 10px",
       border: `2px solid ${PEACH}`,
-      borderRadius: "6px",
-      fontSize: "1rem",
+      borderRadius: "4px",
+      fontSize: "0.9rem",
       backgroundColor: WHITE,
       cursor: "pointer",
       transition: "border-color 0.2s ease",
       fontFamily: "inherit",
     },
     button: {
-      padding: "12px 32px",
+      padding: "10px 16px",
       backgroundColor: ORANGE,
       color: WHITE,
       border: "none",
-      borderRadius: "6px",
-      fontSize: "1rem",
+      borderRadius: "4px",
+      fontSize: "0.95rem",
       fontWeight: "600",
       cursor: "pointer",
       transition: "all 0.2s ease",
       gridColumn: "1 / -1",
-      marginTop: "8px",
+      marginTop: "4px",
     },
     buttonHover: {
       backgroundColor: DARK_ORANGE,
-      transform: "translateY(-2px)",
-      boxShadow: "0 4px 12px rgba(184, 106, 42, 0.25)",
+      transform: "translateY(-1px)",
+      boxShadow: "0 2px 8px rgba(184, 106, 42, 0.25)",
     },
   };
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
       <div style={styles.formGroup}>
-        <label style={styles.label}>Room Width (ft)</label>
+        <label style={styles.label}>Width (ft)</label>
         <input
           style={styles.input}
           name="room_width_ft"
@@ -104,7 +104,7 @@ export default function DesignForm({ onSubmit }) {
       </div>
 
       <div style={styles.formGroup}>
-        <label style={styles.label}>Room Depth (ft)</label>
+        <label style={styles.label}>Depth (ft)</label>
         <input
           style={styles.input}
           name="room_depth_ft"
@@ -119,7 +119,7 @@ export default function DesignForm({ onSubmit }) {
       </div>
 
       <div style={styles.formGroup}>
-        <label style={styles.label}>Budget (₹ INR)</label>
+        <label style={styles.label}>Budget (₹)</label>
         <input
           style={styles.input}
           name="budget_inr"
@@ -134,7 +134,7 @@ export default function DesignForm({ onSubmit }) {
       </div>
 
       <div style={styles.formGroup}>
-        <label style={styles.label}>Aesthetic Theme</label>
+        <label style={styles.label}>Theme</label>
         <select
           style={styles.select}
           name="aesthetic_theme"
@@ -155,7 +155,7 @@ export default function DesignForm({ onSubmit }) {
         onMouseEnter={(e) => Object.assign(e.target.style, styles.buttonHover)}
         onMouseLeave={(e) => Object.assign(e.target.style, styles.button)}
       >
-        🎨 Generate Design
+        🎨 Generate
       </button>
     </form>
   );
