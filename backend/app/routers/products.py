@@ -5,7 +5,9 @@ from typing import Optional, List
 from app.database import get_db
 from app.models.product import Product
 from app.schemas.product import ProductOut
+from app.schemas.design_request import DesignRequest
 from app.services.similarity import get_complementary_items
+from app.services import layout_generator
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -30,10 +32,31 @@ def similar_products(sku_code: str, db: Session = Depends(get_db)):
     Given a product the user selected while browsing the catalogue, return
     complementary items from other categories that match its style —
     powers the 'browse and get matches' flow on the frontend.
+    
+    Also returns layout data for visualizing the bundle in 3D space.
+    Uses default room dimensions (8ft x 6ft) for the browse flow.
     """
     result = get_complementary_items(db, sku_code)
     if not result:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    # Prepare products dict with anchor + best match from each category
+    anchor = result["anchor"]
+    products_for_layout = {anchor.category: anchor}
+    for category, items in result["recommendations"].items():
+        if items:
+            products_for_layout[category] = items[0]  # Take the top match
+    
+    # Use default room dimensions for browse flow
+    default_request = DesignRequest(
+        room_width_ft=8,
+        room_depth_ft=6,
+        budget_inr=200000,
+        aesthetic_theme="Minimalist Modern",
+    )
+    
+    # Generate layout data
+    layout_json = layout_generator.generate_layout(products_for_layout, default_request)
 
     return {
         "anchor": ProductOut.model_validate(result["anchor"]),
@@ -41,4 +64,7 @@ def similar_products(sku_code: str, db: Session = Depends(get_db)):
             category: [ProductOut.model_validate(p) for p in items]
             for category, items in result["recommendations"].items()
         },
+        "layout": layout_json,
+        "room_width_ft": default_request.room_width_ft,
+        "room_depth_ft": default_request.room_depth_ft,
     }
