@@ -7,4 +7,4 @@ class DesignRequest(BaseModel):
     room_depth_ft: float
     budget_inr: float
     aesthetic_theme: str          # e.g. "Minimalist Modern", "Classic Luxury", "Japanese Zen"
-    categories_needed: List[str] = ["toilet", "washbasin", "faucet", "shower"]
+    categories_needed: List[str] = ["toilet", "toilet_seat", "washbasin", "faucet"]

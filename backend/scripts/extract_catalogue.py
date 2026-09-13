@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
     pdf_path = sys.argv[1]
     out_path = os.path.join(
-        os.path.dirname(__file__), "..", "app", "data", "catalogue_seed.csv"
+        os.path.dirname(__file__), "..", "app", "data", "catalogue.csv"
     )
 
     rows = extract(pdf_path)

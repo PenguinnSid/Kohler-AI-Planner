@@ -68,7 +68,7 @@ kohler-bathroom-designer/
 │   │   │   ├── similarity.py
 │   │   │   └── seed.py
 │   │   └── data/
-│   │       └── catalogue_seed.csv
+│   │       └── catalogue.csv
 │   ├── scripts/
 │   │   ├── enrich_catalogue.py
 │   │   ├── extract_catalogue.py

@@ -35,7 +35,7 @@ def match_bundle(candidates: dict, request: DesignRequest) -> dict:
             {
                 "sku_code": p.sku_code,
                 "model_name": p.model_name,
-                "collection": p.collection,
+                "subcategory": p.subcategory,
                 "price_inr": p.price_inr,
                 "description": p.description,
             }

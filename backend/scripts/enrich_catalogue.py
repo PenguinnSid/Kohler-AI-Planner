@@ -1,5 +1,5 @@
 """
-Enriches app/data/catalogue_seed.csv with style_tags, width_in, and depth_in —
+Enriches app/data/catalogue.csv with style_tags, width_in, and depth_in —
 fields the Kohler price book doesn't include. Uses the Gemini API to infer
 plausible values from each product's category and description.
 
@@ -25,7 +25,7 @@ from google.genai import types
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "app", "data", "catalogue_seed.csv")
+CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "app", "data", "catalogue.csv")
 BATCH_SIZE = 10
 MAX_RETRIES = 4
 BASE_DELAY_SECONDS = 4
@@ -122,7 +122,9 @@ Products:
                 print(f"    attempt {attempt} failed ({e}); retrying in {delay}s...")
                 time.sleep(delay)
 
-    raise last_error
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("enrich_batch failed: retry loop ended without an exception")
 
 
 def merge_enrichment(rows, enriched_batch):

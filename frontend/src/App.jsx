@@ -83,6 +83,11 @@ export default function App() {
       flexDirection: "column",
       overflow: "hidden",
     },
+    fullWidthContainer: {
+      flex: "1",
+      overflowY: "auto",
+      backgroundColor: WHITE,
+    },
     section: {
       marginBottom: "32px",
     },
@@ -108,7 +113,7 @@ export default function App() {
       backgroundColor: LIGHT_GRAY,
     },
     tabButton: (active) => ({
-      padding: "12px 20px",
+      padding: "12px 24px",
       border: "none",
       background: active ? WHITE : "none",
       cursor: "pointer",
@@ -120,14 +125,54 @@ export default function App() {
       transition: "all 0.2s ease",
       flex: "0 1 auto",
     }),
+    modalBackdrop: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: "20px",
+    },
+    modalContent: {
+      backgroundColor: WHITE,
+      borderRadius: "8px",
+      padding: "32px",
+      maxWidth: "800px",
+      width: "90%",
+      maxHeight: "85vh",
+      overflowY: "auto",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+      position: "relative",
+    },
+    closeButton: {
+      position: "absolute",
+      top: "16px",
+      right: "16px",
+      backgroundColor: LIGHT_GRAY,
+      border: "none",
+      borderRadius: "50%",
+      width: "32px",
+      height: "32px",
+      cursor: "pointer",
+      fontWeight: "700",
+      fontSize: "1rem",
+      color: "#666",
+    },
   };
 
   return (
     <div style={styles.app}>
       {/* Header - Full Width */}
       <div style={styles.header}>
-        <h1 style={styles.headerTitle}>✨ Kohler AI Bathroom Designer</h1>
-        <p style={styles.headerSubtitle}>Interactive 3D bathroom design with AI-powered recommendations</p>
+        <h1 style={styles.headerTitle}>Kohler Bathroom Designer</h1>
+        <p style={styles.headerSubtitle}>
+          Interactive 3D bathroom design and product recommendations
+        </p>
       </div>
 
       {/* Tabs */}
@@ -139,7 +184,7 @@ export default function App() {
             setSelectedSku(null);
           }}
         >
-          🎨 Generate Design
+          Generate Design
         </button>
         <button
           style={styles.tabButton(mode === "browse")}
@@ -148,113 +193,120 @@ export default function App() {
             setResult(null);
           }}
         >
-          🔍 Browse Catalogue
+          Browse Catalogue
         </button>
       </div>
 
       {/* Main Body */}
       <div style={styles.body}>
-        {/* Left Panel - Form & Info */}
-        <div style={styles.leftPanel}>
-          {mode === "generate" && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>Design Parameters</h3>
-              <DesignForm onSubmit={handleSubmit} />
-            </div>
-          )}
-
-          {mode === "browse" && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>Browse Products</h3>
-              <CatalogBrowser onSelect={setSelectedSku} />
-            </div>
-          )}
-
-          {result && result.bundle && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>Recommended Bundle</h3>
-              <BundleResult bundle={result.bundle} />
-            </div>
-          )}
-
-          {selectedSku && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>Matching Items</h3>
-              <SimilarItems skuCode={selectedSku} />
-            </div>
-          )}
-
-          {selectedProduct && (
-            <div style={{
-              backgroundColor: LIGHT_GRAY,
-              padding: "20px",
-              borderRadius: "8px",
-              marginBottom: "20px",
-            }}>
-              <h4 style={{ margin: "0 0 12px 0", color: DARK_ORANGE }}>
-                📦 {selectedProduct.model_name}
-              </h4>
-              <div style={{ fontSize: "0.9rem", color: "#666", lineHeight: "1.6" }}>
-                <div><strong>Category:</strong> {selectedProduct.category}</div>
-                <div><strong>Price:</strong> ₹ {selectedProduct.price_inr?.toLocaleString('en-IN')}</div>
-                {selectedProduct.width_in && <div><strong>Width:</strong> {selectedProduct.width_in}"</div>}
-                {selectedProduct.depth_in && <div><strong>Depth:</strong> {selectedProduct.depth_in}"</div>}
-                {selectedProduct.collection && <div><strong>Collection:</strong> {selectedProduct.collection}</div>}
-                {selectedProduct.style_tags && (
-                  <div><strong>Style:</strong> {selectedProduct.style_tags.join(", ")}</div>
-                )}
+        {mode === "generate" && (
+          <>
+            {/* Left Panel - Form & Info */}
+            <div style={styles.leftPanel}>
+              <div style={styles.section}>
+                <h3 style={styles.sectionTitle}>Design Parameters</h3>
+                <DesignForm onSubmit={handleSubmit} />
               </div>
-              <button
-                onClick={() => setSelectedProduct(null)}
-                style={{
-                  marginTop: "12px",
-                  padding: "8px 12px",
-                  backgroundColor: ORANGE,
-                  color: WHITE,
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  fontSize: "0.85rem",
-                  fontWeight: "600",
-                }}
-              >
-                Close
-              </button>
-            </div>
-          )}
-        </div>
 
-        {/* Right Panel - 3D Viewer */}
-        <div style={styles.mainViewer}>
-          {loading && (
-            <div style={{ ...styles.loadingBox, margin: "40px", alignSelf: "center" }}>
-              ⏳ Generating your design... Please wait.
-            </div>
-          )}
+              {result && result.bundle && (
+                <div style={styles.section}>
+                  <h3 style={styles.sectionTitle}>Recommended Bundle</h3>
+                  <BundleResult bundle={result.bundle} />
+                </div>
+              )}
 
-          {result && result.layout && (
-            <LayoutViewer3D
-              layoutData={result.layout}
-              roomWidth={result.room_width_ft}
-              roomDepth={result.room_depth_ft}
-              onProductClick={setSelectedProduct}
-            />
-          )}
-
-          {!result && mode === "generate" && !loading && (
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              color: "#999",
-              fontSize: "1.1rem",
-            }}>
-              Enter your room dimensions and click Generate to see the 3D layout
+              {selectedProduct && (
+                <div style={{
+                  backgroundColor: LIGHT_GRAY,
+                  padding: "20px",
+                  borderRadius: "8px",
+                  marginBottom: "20px",
+                }}>
+                  <h4 style={{ margin: "0 0 12px 0", color: DARK_ORANGE }}>
+                    {selectedProduct.model_name}
+                  </h4>
+                  <div style={{ fontSize: "0.9rem", color: "#666", lineHeight: "1.6" }}>
+                    <div><strong>Category:</strong> {selectedProduct.category}</div>
+                    <div><strong>Price:</strong> ₹ {selectedProduct.price_inr?.toLocaleString('en-IN')}</div>
+                    {selectedProduct.width_in && <div><strong>Width:</strong> {selectedProduct.width_in}"</div>}
+                    {selectedProduct.depth_in && <div><strong>Depth:</strong> {selectedProduct.depth_in}"</div>}
+                    {selectedProduct.collection && <div><strong>Collection:</strong> {selectedProduct.collection}</div>}
+                    {selectedProduct.style_tags && (
+                      <div><strong>Style:</strong> {selectedProduct.style_tags.join(", ")}</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setSelectedProduct(null)}
+                    style={{
+                      marginTop: "12px",
+                      padding: "8px 12px",
+                      backgroundColor: ORANGE,
+                      color: WHITE,
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* Right Panel - 3D Viewer */}
+            <div style={styles.mainViewer}>
+              {loading && (
+                <div style={{ ...styles.loadingBox, margin: "40px", alignSelf: "center" }}>
+                  Generating your design... Please wait.
+                </div>
+              )}
+
+              {result && result.layout && (
+                <LayoutViewer3D
+                  layoutData={result.layout}
+                  roomWidth={result.room_width_ft}
+                  roomDepth={result.room_depth_ft}
+                  onProductClick={setSelectedProduct}
+                />
+              )}
+
+              {!result && !loading && (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  color: "#999",
+                  fontSize: "1.1rem",
+                }}>
+                  Enter your room dimensions and click Generate Design to see the 3D layout
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {mode === "browse" && (
+          <div style={styles.fullWidthContainer}>
+            <CatalogBrowser onSelect={setSelectedSku} />
+          </div>
+        )}
       </div>
+
+      {/* Modal Overlay for Matching Items in Browse Mode */}
+      {selectedSku && (
+        <div style={styles.modalBackdrop} onClick={() => setSelectedSku(null)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <button style={styles.closeButton} onClick={() => setSelectedSku(null)}>
+              ✕
+            </button>
+            <SimilarItems skuCode={selectedSku} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

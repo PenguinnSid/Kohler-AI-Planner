@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.routers import products, design
 from app.database import engine, Base, SessionLocal
@@ -18,29 +20,34 @@ app.add_middleware(
 # Create tables
 Base.metadata.create_all(bind=engine)
 
+# Mount 3D files directory for serving OBJ models
+models_dir = os.path.join(os.path.dirname(__file__), "3d_files")
+if os.path.exists(models_dir):
+    app.mount("/api/3d", StaticFiles(directory=models_dir), name="3d_models")
+
 # Seed database on startup
 @app.on_event("startup")
 def startup_event():
     print("\n" + "="*60)
-    print("🚀 Kohler AI Bathroom Designer - Startup Event")
+    print("Kohler Bathroom Designer - Startup Event")
     print("="*60)
     db = SessionLocal()
     try:
-        print("📦 Attempting to seed catalogue from CSV...")
+        print("Attempting to seed catalogue from CSV...")
         count = seed.seed_from_csv(db)
         if count > 0:
-            print(f"✅ Successfully seeded {count} new products")
+            print(f"Successfully seeded {count} new products")
         else:
-            print("✅ Catalogue already seeded (0 new products)")
+            print("Catalogue already seeded (0 new products)")
         
         # Verify products in DB
         total = db.query(Product).count()
-        print(f"📊 Total products in database: {total}")
+        print(f"Total products in database: {total}")
         
     except FileNotFoundError as e:
-        print(f"❌ CSV file not found: {e}")
+        print(f"CSV file not found: {e}")
     except Exception as e:
-        print(f"⚠️  Seeding error: {type(e).__name__}: {e}")
+        print(f"Seeding error: {type(e).__name__}: {e}")
     finally:
         db.close()
     print("="*60 + "\n")
@@ -72,3 +79,9 @@ def health():
         }
     finally:
         db.close()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+

@@ -155,7 +155,7 @@ export default function DesignForm({ onSubmit }) {
         onMouseEnter={(e) => Object.assign(e.target.style, styles.buttonHover)}
         onMouseLeave={(e) => Object.assign(e.target.style, styles.button)}
       >
-        🎨 Generate
+        Generate Design
       </button>
     </form>
   );

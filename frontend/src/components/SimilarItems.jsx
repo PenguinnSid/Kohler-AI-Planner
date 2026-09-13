@@ -80,13 +80,13 @@ export default function SimilarItems({ skuCode }) {
     },
   };
 
-  if (loading) return <div style={styles.emptyState}>🔍 Finding the perfect matches...</div>;
-  if (error) return <div style={styles.emptyState}>❌ Error: {error}</div>;
+  if (loading) return <div style={styles.emptyState}>Finding matching products...</div>;
+  if (error) return <div style={styles.emptyState}>Error: {error}</div>;
   if (!data) return <div style={styles.emptyState}>No data available</div>;
 
   return (
     <div>
-      <h3 style={styles.heading}>💎 Matches for "{data.anchor.model_name}"</h3>
+      <h3 style={styles.heading}>Matching Products for "{data.anchor.model_name}"</h3>
       
       {Object.entries(data.recommendations).map(([category, items]) => (
         <div key={category} style={styles.categorySection}>
@@ -114,7 +114,7 @@ export default function SimilarItems({ skuCode }) {
       {/* 3D Layout Viewer */}
       {data.layout && (
         <div style={{ marginTop: "32px" }}>
-          <h3 style={styles.heading}>🎨 3D Layout Preview</h3>
+          <h3 style={styles.heading}>3D Layout Preview</h3>
           <LayoutViewer3D
             layoutData={data.layout}
             roomWidth={data.room_width_ft}
