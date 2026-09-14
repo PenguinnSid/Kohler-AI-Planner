@@ -18,36 +18,75 @@ function getProductColor(modelName) {
   return "#FFFFFF"; // High-gloss Kohler Pure White Porcelain
 }
 
-// Helper to generate dynamic floor textures matching the chosen theme
-function createFloorTexture(theme) {
+// Helper to generate dynamic floor textures matching chosen floor theme
+function createFloorTexture(floorTheme) {
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext("2d");
 
-  const isZen = theme === "Japanese Zen";
-  const isClassic = theme === "Classic Luxury";
+  const theme = (floorTheme || "").toLowerCase();
 
-  if (isZen) {
-    // Warm natural wood/bamboo plank floor
+  if (theme.includes("slate")) {
+    // Charcoal Slate Tile
+    ctx.fillStyle = "#1E293B";
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = "#0F172A";
+    ctx.lineWidth = 4;
+    const tileSize = 256;
+    for (let x = 0; x <= 512; x += tileSize) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
+    }
+    for (let y = 0; y <= 512; y += tileSize) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+    }
+  } else if (theme.includes("wood")) {
+    // Warm Bamboo Planks
     ctx.fillStyle = "#C59B6D";
     ctx.fillRect(0, 0, 512, 512);
-
-    ctx.strokeStyle = "#B38758";
+    ctx.strokeStyle = "#9A7144";
     ctx.lineWidth = 3;
     for (let y = 0; y < 512; y += 64) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
     }
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(120, 80, 40, 0.15)";
+    ctx.strokeStyle = "rgba(100, 60, 20, 0.15)";
     for (let y = 8; y < 512; y += 16) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
     }
-  } else if (isClassic) {
-    // Polished Carrara Marble floor tile
+  } else if (theme.includes("hex")) {
+    // Hexagon Ceramic Tile
+    ctx.fillStyle = "#E2E8F0";
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.strokeStyle = "#CBD5E1";
+    ctx.lineWidth = 2;
+    const r = 32;
+    for (let y = 0; y < 512 + r; y += r * 1.5) {
+      for (let x = 0; x < 512 + r; x += r * Math.sqrt(3)) {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI) / 3;
+          const px = x + r * Math.cos(angle);
+          const py = y + r * Math.sin(angle);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  } else if (theme.includes("concrete")) {
+    // Matte Concrete
+    ctx.fillStyle = "#64748B";
+    ctx.fillRect(0, 0, 512, 512);
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    for (let i = 0; i < 500; i++) {
+      ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+    }
+  } else {
+    // Carrara Marble floor tile (Default)
     ctx.fillStyle = "#EAE6DF";
     ctx.fillRect(0, 0, 512, 512);
-
     ctx.strokeStyle = "rgba(160, 150, 140, 0.35)";
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -66,20 +105,6 @@ function createFloorTexture(theme) {
     for (let y = 0; y <= 512; y += tileSize) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
     }
-  } else {
-    // Minimalist Modern light matte grey ceramic tile
-    ctx.fillStyle = "#E5E7EB";
-    ctx.fillRect(0, 0, 512, 512);
-
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#D1D5DB";
-    const tileSize = 256;
-    for (let x = 0; x <= 512; x += tileSize) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke();
-    }
-    for (let y = 0; y <= 512; y += tileSize) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
-    }
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -88,66 +113,83 @@ function createFloorTexture(theme) {
   return texture;
 }
 
-function Floor({ width, depth, theme }) {
+function Floor({ width, depth, floorTheme }) {
   const texture = useMemo(() => {
-    const tex = createFloorTexture(theme);
+    const tex = createFloorTexture(floorTheme);
     tex.repeat.set(Math.max(1, width / 24), Math.max(1, depth / 24));
     return tex;
-  }, [width, depth, theme]);
+  }, [width, depth, floorTheme]);
 
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[width / 2, -0.1, depth / 2]} receiveShadow>
-      <planeGeometry args={[width + 60, depth + 60]} />
+      <planeGeometry args={[width, depth]} />
       <meshStandardMaterial map={texture} roughness={0.2} metalness={0.05} />
     </mesh>
   );
 }
 
+// Dynamic 3D Vanity Mirror component (moves and auto-aligns to any wall based on 2D placement)
+function VanityMirror({ washbasinPlacement, cabinetPlacement, mirrorPlacement, windowPlacement, roomWidth, roomDepth }) {
+  const targetObj = mirrorPlacement || cabinetPlacement || washbasinPlacement;
+  if (!targetObj) return null;
 
+  const targetX = targetObj.x || 0;
+  const targetY = targetObj.y || 0;
+  const targetW = targetObj.width_in || targetObj.w || 26;
+  const targetH = targetObj.depth_in || targetObj.h || 3;
 
-// Vanity Mirror mounted above Washbasin
-function VanityMirror({ washbasinPlacement, roomWidth, roomDepth }) {
-  if (!washbasinPlacement) return null;
-  const { x, y, width_in, depth_in } = washbasinPlacement;
-  const centerX = x + width_in / 2;
-  const centerZ = y + depth_in / 2;
-  const mirrorWidth = Math.max(20, width_in * 0.9);
-  const mirrorHeight = Math.max(28, mirrorWidth * 1.25);
-  // Bottom of mirror starts 6" above sink counter top (~30"), so center Y = 36 + mirrorHeight / 2
+  let mirrorWidth = Math.max(14, targetW);
+  const mirrorHeight = Math.max(20, mirrorWidth * 0.9);
   const mirrorY = 36 + mirrorHeight / 2;
 
-  // Calculate distance from sink center to each of the 4 walls
-  const distBack = centerZ;
-  const distFront = roomDepth - centerZ;
-  const distLeft = centerX;
-  const distRight = roomWidth - centerX;
-
-  const minDist = Math.min(distBack, distFront, distLeft, distRight);
-
-  let posX = centerX;
+  let posX = targetX + targetW / 2;
   let posZ = 0.4;
   let rotY = 0;
 
-  if (minDist === distLeft) {
-    // Left Wall
-    posX = 0.4;
-    posZ = centerZ;
-    rotY = Math.PI / 2;
-  } else if (minDist === distRight) {
-    // Right Wall
-    posX = roomWidth - 0.4;
-    posZ = centerZ;
-    rotY = -Math.PI / 2;
-  } else if (minDist === distFront) {
-    // Front Wall
-    posX = centerX;
+  const rotDeg = targetObj.rotation_deg || targetObj.rot || 0;
+  const wallSnapSide = targetObj.wallSnapSide;
+
+  const distTop = targetY;
+  const distBottom = roomDepth - (targetY + targetH);
+  const distLeft = targetX;
+  const distRight = roomWidth - (targetX + targetW);
+
+  const minDist = Math.min(distTop, distBottom, distLeft, distRight);
+
+  if (wallSnapSide === "bottom" || rotDeg === 180 || (!wallSnapSide && minDist === distBottom && distBottom < 20)) {
+    posX = targetX + targetW / 2;
     posZ = roomDepth - 0.4;
     rotY = Math.PI;
+  } else if (wallSnapSide === "left" || rotDeg === 90 || (!wallSnapSide && minDist === distLeft && distLeft < 20)) {
+    posX = 0.4;
+    posZ = targetY + targetH / 2;
+    rotY = Math.PI / 2;
+  } else if (wallSnapSide === "right" || rotDeg === 270 || (!wallSnapSide && minDist === distRight && distRight < 20)) {
+    posX = roomWidth - 0.4;
+    posZ = targetY + targetH / 2;
+    rotY = -Math.PI / 2;
   } else {
-    // Back Wall (default)
-    posX = centerX;
+    // Back wall default
+    posX = targetX + targetW / 2;
     posZ = 0.4;
     rotY = 0;
+
+    // Check window intersection on back wall
+    if (windowPlacement) {
+      const winW = windowPlacement.width_in || windowPlacement.w || 32;
+      const winX = windowPlacement.x ?? Math.max(0, roomWidth / 2 - winW / 2);
+      const winRight = winX + winW;
+      const mirLeft = posX - mirrorWidth / 2;
+      const mirRight = posX + mirrorWidth / 2;
+
+      if (mirLeft < winRight && mirRight > winX) {
+        const newLeft = winRight + 1;
+        if (newLeft + mirrorWidth > roomWidth) {
+          mirrorWidth = Math.max(14, roomWidth - newLeft - 1);
+        }
+        posX = newLeft + mirrorWidth / 2;
+      }
+    }
   }
 
   return (
@@ -157,16 +199,35 @@ function VanityMirror({ washbasinPlacement, roomWidth, roomDepth }) {
         <boxGeometry args={[mirrorWidth + 1.2, mirrorHeight + 1.2, 0.8]} />
         <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.8} />
       </mesh>
+
       {/* High Reflection Mirror Glass Pane */}
       <mesh position={[0, 0, 0.45]}>
         <planeGeometry args={[mirrorWidth, mirrorHeight]} />
         <meshStandardMaterial
-          color="#F8FAFC"
-          roughness={0.03}
-          metalness={0.95}
-          emissive="#FFFFFF"
-          emissiveIntensity={0.08}
+          color="#E2E8F0"
+          roughness={0.01}
+          metalness={0.98}
+          emissive="#F1F5F9"
+          emissiveIntensity={0.12}
         />
+      </mesh>
+
+      {/* Diagonal Specular Reflection Sheen Overlay */}
+      <mesh position={[0, 0, 0.46]} rotation={[0, 0, -Math.PI / 6]}>
+        <planeGeometry args={[mirrorWidth * 0.4, mirrorHeight * 1.3]} />
+        <meshBasicMaterial
+          color="#FFFFFF"
+          transparent
+          opacity={0.18}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Backlit Soft LED Frame Glow & Ambient Point Light */}
+      <pointLight position={[0, 0, 2]} color="#FFE8D6" intensity={1.8} distance={70} />
+      <mesh position={[0, 0, -0.05]}>
+        <boxGeometry args={[mirrorWidth + 3, mirrorHeight + 3, 0.4]} />
+        <meshStandardMaterial color="#FFB86C" emissive="#FFB86C" emissiveIntensity={0.8} transparent opacity={0.45} />
       </mesh>
     </group>
   );
@@ -240,8 +301,8 @@ function BathroomDoor({ doorPlacement, roomWidth, roomDepth }) {
   );
 }
 
-// Dynamic Wall Texture & Aesthetics matching Theme (Fully Enclosed Room: 4 Walls + Ceiling)
-function RoomWalls({ width, depth, theme, washbasinPlacement, doorPlacement, windowPlacement }) {
+// Dynamic Wall Texture & Aesthetics (Exact Room Square/Rectangular Box Geometry)
+function RoomWalls({ width, depth, theme, wallTheme, wallSide, washbasinPlacement, cabinetPlacement, doorPlacement, windowPlacement, mirrorPlacement }) {
   const wallHeight = 120; // 10 feet tall
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
@@ -249,10 +310,9 @@ function RoomWalls({ width, depth, theme, washbasinPlacement, doorPlacement, win
     canvas.height = 512;
     const ctx = canvas.getContext("2d");
 
-    const isZen = theme === "Japanese Zen";
-    const isClassic = theme === "Classic Luxury";
+    const wTheme = (wallTheme || theme || "").toLowerCase();
 
-    if (isClassic) {
+    if (wTheme.includes("marble")) {
       ctx.fillStyle = "#F4F2EE";
       ctx.fillRect(0, 0, 512, 512);
 
@@ -261,12 +321,44 @@ function RoomWalls({ width, depth, theme, washbasinPlacement, doorPlacement, win
       ctx.beginPath();
       ctx.moveTo(0, 50); ctx.bezierCurveTo(150, 120, 300, 400, 512, 480);
       ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(100, 0); ctx.bezierCurveTo(200, 200, 350, 100, 512, 300);
-      ctx.stroke();
 
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(180, 172, 160, 0.5)";
+      const tileH = 128;
+      for (let y = 0; y <= 512; y += tileH) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+      }
+    } else if (wTheme.includes("wood")) {
+      ctx.fillStyle = "#D8C4B6";
+      ctx.fillRect(0, 0, 512, 512);
+
+      ctx.fillStyle = "#8B5E34";
+      for (let x = 0; x < 512; x += 64) {
+        ctx.fillRect(x, 0, 8, 512);
+      }
+    } else if (wTheme.includes("slate")) {
+      ctx.fillStyle = "#1E293B";
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = "#334155";
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(180, 172, 160, 0.6)";
+      for (let y = 0; y <= 512; y += 64) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+      }
+    } else if (wTheme.includes("travertine") || wTheme.includes("stone")) {
+      ctx.fillStyle = "#E5D3B3";
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = "rgba(180, 150, 110, 0.3)";
+      ctx.lineWidth = 2;
+      for (let y = 0; y <= 512; y += 96) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+      }
+    } else {
+      // White Subway Tile (Default)
+      ctx.fillStyle = "#FAFAFA";
+      ctx.fillRect(0, 0, 512, 512);
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#E2E8F0";
       const tileW = 128;
       const tileH = 64;
       for (let y = 0; y <= 512; y += tileH) {
@@ -278,78 +370,61 @@ function RoomWalls({ width, depth, theme, washbasinPlacement, doorPlacement, win
           ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + tileH); ctx.stroke();
         }
       }
-    } else if (isZen) {
-      ctx.fillStyle = "#D8C4B6";
-      ctx.fillRect(0, 0, 512, 512);
-
-      ctx.fillStyle = "#8B5E34";
-      for (let x = 0; x < 512; x += 128) {
-        ctx.fillRect(x, 0, 12, 512);
-      }
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "rgba(100, 70, 40, 0.15)";
-      for (let y = 0; y < 512; y += 32) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
-      }
-    } else {
-      ctx.fillStyle = "#FAFAFA";
-      ctx.fillRect(0, 0, 512, 512);
-
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#E5E7EB";
-      for (let y = 0; y <= 512; y += 128) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
-      }
     }
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(Math.max(1, (width + 100) / 48), wallHeight / 48);
+    tex.repeat.set(Math.max(1, width / 48), wallHeight / 48);
     return tex;
-  }, [width, depth, theme]);
+  }, [width, depth, theme, wallTheme]);
 
-  const baseboardColor = theme === "Japanese Zen" ? "#6E4729" : (theme === "Classic Luxury" ? "#E2E8F0" : "#FFFFFF");
+  const baseboardColor = (wallTheme || theme || "").toLowerCase().includes("wood") ? "#6E4729" : ((wallTheme || theme || "").toLowerCase().includes("slate") ? "#334155" : "#FFFFFF");
+  const sideMat = wallSide || THREE.FrontSide;
 
   return (
     <group>
       {/* Back Wall */}
-      <mesh position={[width / 2, wallHeight / 2, -0.5]} receiveShadow>
-        <planeGeometry args={[width + 40, wallHeight]} />
-        <meshStandardMaterial map={texture} roughness={0.4} side={THREE.DoubleSide} />
+      <mesh position={[width / 2, wallHeight / 2, 0]} receiveShadow>
+        <planeGeometry args={[width, wallHeight]} />
+        <meshStandardMaterial map={texture} roughness={0.4} side={sideMat} />
       </mesh>
 
       {/* Front Wall */}
-      <mesh rotation={[0, Math.PI, 0]} position={[width / 2, wallHeight / 2, depth + 0.5]} receiveShadow>
-        <planeGeometry args={[width + 40, wallHeight]} />
-        <meshStandardMaterial map={texture} roughness={0.4} side={THREE.DoubleSide} />
+      <mesh rotation={[0, Math.PI, 0]} position={[width / 2, wallHeight / 2, depth]} receiveShadow>
+        <planeGeometry args={[width, wallHeight]} />
+        <meshStandardMaterial map={texture} roughness={0.4} side={sideMat} />
       </mesh>
 
       {/* Left Wall */}
-      <mesh rotation={[0, Math.PI / 2, 0]} position={[-0.5, wallHeight / 2, depth / 2]} receiveShadow>
-        <planeGeometry args={[depth + 40, wallHeight]} />
-        <meshStandardMaterial map={texture} roughness={0.4} side={THREE.DoubleSide} />
+      <mesh rotation={[0, Math.PI / 2, 0]} position={[0, wallHeight / 2, depth / 2]} receiveShadow>
+        <planeGeometry args={[depth, wallHeight]} />
+        <meshStandardMaterial map={texture} roughness={0.4} side={sideMat} />
       </mesh>
 
       {/* Right Wall */}
-      <mesh rotation={[0, -Math.PI / 2, 0]} position={[width + 0.5, wallHeight / 2, depth / 2]} receiveShadow>
-        <planeGeometry args={[depth + 40, wallHeight]} />
-        <meshStandardMaterial map={texture} roughness={0.4} side={THREE.DoubleSide} />
+      <mesh rotation={[0, -Math.PI / 2, 0]} position={[width, wallHeight / 2, depth / 2]} receiveShadow>
+        <planeGeometry args={[depth, wallHeight]} />
+        <meshStandardMaterial map={texture} roughness={0.4} side={sideMat} />
       </mesh>
 
       {/* Enclosed Ceiling */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[width / 2, wallHeight + 0.5, depth / 2]}>
-        <planeGeometry args={[width + 40, depth + 40]} />
-        <meshStandardMaterial color="#FAFAFA" roughness={0.3} side={THREE.DoubleSide} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[width / 2, wallHeight, depth / 2]}>
+        <planeGeometry args={[width, depth]} />
+        <meshStandardMaterial color="#FAFAFA" roughness={0.3} side={sideMat} />
       </mesh>
 
-      {/* Baseboard Border around 4 walls */}
-      <mesh position={[width / 2, 2, 0.2]}>
-        <boxGeometry args={[width + 40, 4, 1]} />
+      {/* Baseboard Border Flush with Walls */}
+      <mesh position={[width / 2, 2, 0.5]}>
+        <boxGeometry args={[width, 4, 1]} />
         <meshStandardMaterial color={baseboardColor} roughness={0.3} />
       </mesh>
-      <mesh rotation={[0, Math.PI / 2, 0]} position={[0.2, 2, depth / 2]}>
-        <boxGeometry args={[depth + 40, 4, 1]} />
+      <mesh rotation={[0, Math.PI / 2, 0]} position={[0.5, 2, depth / 2]}>
+        <boxGeometry args={[depth, 4, 1]} />
+        <meshStandardMaterial color={baseboardColor} roughness={0.3} />
+      </mesh>
+      <mesh rotation={[0, Math.PI / 2, 0]} position={[width - 0.5, 2, depth / 2]}>
+        <boxGeometry args={[depth, 4, 1]} />
         <meshStandardMaterial color={baseboardColor} roughness={0.3} />
       </mesh>
 
@@ -357,7 +432,7 @@ function RoomWalls({ width, depth, theme, washbasinPlacement, doorPlacement, win
       <FakeWindow windowPlacement={windowPlacement} roomWidth={width} roomDepth={depth} />
 
       {/* Vanity Mirror mounted above Washbasin */}
-      <VanityMirror washbasinPlacement={washbasinPlacement} roomWidth={width} roomDepth={depth} />
+      <VanityMirror washbasinPlacement={washbasinPlacement} cabinetPlacement={cabinetPlacement} mirrorPlacement={mirrorPlacement} windowPlacement={windowPlacement} roomWidth={width} roomDepth={depth} />
 
       {/* Architectural 3D Door */}
       <BathroomDoor doorPlacement={doorPlacement} roomWidth={width} roomDepth={depth} />
@@ -365,9 +440,11 @@ function RoomWalls({ width, depth, theme, washbasinPlacement, doorPlacement, win
   );
 }
 
-// Orange Hotspot Stub with Price Tag & Floating Callout
-function OrangeHotspotStub({ position, placement, isSelected, onClick }) {
+// Orange Hotspot Stub with Price Tag & Floating Callout + Left/Right Product Cycle Arrows
+function OrangeHotspotStub({ position, placement, isSelected, onClick, onCycleProduct, hideHotspots }) {
   const [hovered, setHovered] = useState(false);
+
+  if (hideHotspots) return null;
 
   return (
     <Html position={position} center style={{ pointerEvents: "none", userSelect: "none" }}>
@@ -445,119 +522,130 @@ function OrangeHotspotStub({ position, placement, isSelected, onClick }) {
               }}
             />
           </div>
-
-          {placement.price_inr && (
-            <div
-              style={{
-                backgroundColor: "#D97E3A",
-                color: "#FFFFFF",
-                fontSize: "0.8rem",
-                fontWeight: "700",
-                padding: "3px 8px",
-                borderRadius: "12px",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-                whiteSpace: "nowrap",
-                fontFamily: "'Segoe UI', Roboto, sans-serif",
-                transition: "all 0.2s ease",
-                transform: hovered || isSelected ? "scale(1.08)" : "scale(1)",
-              }}
-            >
-              ₹ {placement.price_inr.toLocaleString("en-IN")}
-            </div>
-          )}
         </div>
 
-        {isSelected && (
-          <div
-            style={{
-              position: "absolute",
-              left: "24px",
-              bottom: "16px",
-              display: "flex",
-              alignItems: "flex-end",
-              pointerEvents: "auto",
-              minWidth: "220px",
-            }}
-          >
-            <svg width="45" height="35" style={{ overflow: "visible", flexShrink: 0 }}>
-              <polyline
-                points="0,35 25,8 45,8"
-                fill="none"
-                stroke="#D97E3A"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+        {/* Floating Callout Card matching screenshot format + Left & Right Cycle Arrows */}
+        {isSelected && !hideHotspots && (() => {
+          const catNorm = (placement?.category || "").toLowerCase();
+          const isBelow = catNorm === "bathtub";
 
+          return (
             <div
               style={{
-                marginLeft: "6px",
-                color: "#FFFFFF",
-                fontFamily: "'Segoe UI', Roboto, sans-serif",
-                textShadow: "0 2px 8px rgba(0,0,0,0.95), 0 0 12px rgba(0,0,0,0.9)",
-                lineHeight: "1.5",
+                position: "absolute",
+                left: "14px",
+                ...(isBelow ? { top: "14px" } : { bottom: "12px" }),
+                display: "flex",
+                alignItems: isBelow ? "flex-start" : "flex-end",
+                pointerEvents: "auto",
+                zIndex: 30,
               }}
             >
+              {/* SVG Pointer Bar starting OUTSIDE the circle and merging seamlessly into category title underline */}
+              <svg width="46" height="38" style={{ overflow: "visible", flexShrink: 0, display: "block" }}>
+                <polyline
+                  points={isBelow ? "4,4 24,28 46,28" : "4,34 24,6 46,6"}
+                  fill="none"
+                  stroke="#D97E3A"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+
               <div
                 style={{
-                  fontSize: "1.1rem",
-                  fontWeight: "700",
-                  color: "#FFD166",
-                  textTransform: "uppercase",
-                  borderBottom: "2px solid #D97E3A",
-                  paddingBottom: "2px",
-                  marginBottom: "4px",
-                  letterSpacing: "0.8px",
+                  marginLeft: "-1px",
+                  marginTop: isBelow ? "21px" : "0",
+                  marginBottom: isBelow ? "0" : "1px",
+                  color: "#FFFFFF",
+                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                  lineHeight: "1.45",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  padding: "0 0 0 4px",
+                  minWidth: "220px",
                 }}
               >
-                {placement.category ? (
-                  placement.category.toLowerCase().includes("washbasin") || placement.category.toLowerCase().includes("wash_basin")
-                    ? "Wash Basin"
-                    : placement.category.replace("_", " ")
-                ) : "Fixture"}
+                {/* Category Header Title in Orange merged directly with pointer bar */}
+                <div
+                  style={{
+                    borderBottom: "2px solid #D97E3A",
+                    paddingBottom: "4px",
+                    marginBottom: "6px",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.9rem",
+                      fontWeight: "800",
+                      color: "#D97E3A",
+                      textTransform: "uppercase",
+                      letterSpacing: "1px",
+                    }}
+                  >
+                    {placement.category ? (
+                      placement.category.toLowerCase().includes("washbasin") || placement.category.toLowerCase().includes("wash_basin")
+                        ? "Wash Basin"
+                        : placement.category.replace("_", " ")
+                    ) : "Fixture"}
+                  </div>
+                </div>
+
+                <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#FFFFFF", marginBottom: "3px" }}>
+                  Name: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.model_name}</span>
+                </div>
+                {placement.price_inr && (
+                  <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#FFFFFF", marginBottom: "3px" }}>
+                    Price: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>₹ {placement.price_inr.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+                {placement.width_in && placement.depth_in && (
+                  <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#FFFFFF" }}>
+                    Dimensions: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.width_in}" W x {placement.depth_in}" D</span>
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>
-                Name: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.model_name}</span>
-              </div>
-              {placement.price_inr && (
-                <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>
-                  Price: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>₹ {placement.price_inr.toLocaleString("en-IN")}</span>
-                </div>
-              )}
-              {placement.width_in && placement.depth_in && (
-                <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>
-                  Dimensions: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.width_in}" W x {placement.depth_in}" D</span>
-                </div>
-              )}
-              {placement.seat_included && (
-                <div style={{ fontSize: "0.85rem", color: "#6EE7B7", fontWeight: "600", marginTop: "2px" }}>
-                  Quiet-Close Seat Included
-                </div>
-              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </Html>
   );
 }
 
-function OBJProduct({ placement, isSelected, onClick }) {
+function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots }) {
   const { sku_code, category, x, y, width_in, depth_in, model_name, obj_file_path, platform_height_offset } = placement;
   const [model, setModel] = useState(null);
 
-  const centerX = x + width_in / 2;
-  const centerZ = y + depth_in / 2;
-  const platformOffset = platform_height_offset || 0;
-  const isCatalogueItem = ['toilet', 'toilet_seat', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
+  const wIn = Number(width_in) || 16;
+  const dIn = Number(depth_in) || 16;
+  let centerX = (Number(x) || 0) + wIn / 2;
+  let centerZ = (Number(y) || 0) + dIn / 2;
+
+  // Lock counter platform center to washbasin center for exact 3D alignment
+  if ((category || '').toLowerCase() === 'sink_platform' || (category || '').toLowerCase() === 'cabinet') {
+    const washbasinItem = layoutData?.find(p => (p.category || '').toLowerCase() === 'washbasin' || (p.category || '').toLowerCase() === 'wash_basin');
+    if (washbasinItem) {
+      const wbW = Number(washbasinItem.width_in) || 22;
+      const wbD = Number(washbasinItem.depth_in) || 18;
+      centerX = (Number(washbasinItem.x) || 0) + wbW / 2;
+      centerZ = (Number(washbasinItem.y) || 0) + wbD / 2;
+    }
+  }
+
+  const platformOffset = Number(platform_height_offset) || 0;
+  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
 
   useEffect(() => {
-    if (obj_file_path) {
+    let isSubscribed = true;
+    if (obj_file_path && sku_code) {
       const loader = new OBJLoader();
       loader.load(
         `${BASE_URL}/api/3d/${sku_code}.obj`,
         (object) => {
+          if (!isSubscribed || !object) return;
+
           const isVeil20704 = sku_code && sku_code.includes("20704");
           const isVeil20703 = sku_code && sku_code.includes("20703");
 
@@ -571,16 +659,26 @@ function OBJProduct({ placement, isSelected, onClick }) {
           let box = new THREE.Box3().setFromObject(object);
           let size = box.getSize(new THREE.Vector3());
 
-          if (!isVeil20704 && !isVeil20703 && category === 'washbasin' && size.x < size.z) {
+          // Defensive check against empty/corrupted OBJ models or 404 HTML text parsing
+          if (!size || isNaN(size.x) || isNaN(size.z) || size.x <= 0 || size.z <= 0 || !isFinite(size.x) || !isFinite(size.z)) {
+            console.warn(`Loaded OBJ model ${sku_code} has invalid geometry bounds. Fallback to procedural 3D block.`);
+            return;
+          }
+
+          if (!isVeil20704 && (category === 'washbasin' || category === 'wash_basin') && size.x < size.z) {
             object.rotation.y += Math.PI / 2;
             object.updateMatrixWorld(true);
             box = new THREE.Box3().setFromObject(object);
             size = box.getSize(new THREE.Vector3());
           }
 
-          const scale = Math.min(width_in / (size.x || 1), depth_in / (size.z || 1));
-
+          const scale = Math.min(wIn / (size.x || 1), dIn / (size.z || 1));
           const center = box.getCenter(new THREE.Vector3());
+
+          if (isNaN(center.x) || isNaN(center.y) || isNaN(center.z) || !isFinite(center.x)) {
+            return;
+          }
+
           object.position.x = -center.x * scale;
           object.position.y = -box.min.y * scale;
           object.position.z = -center.z * scale;
@@ -605,13 +703,16 @@ function OBJProduct({ placement, isSelected, onClick }) {
           
           const group = new THREE.Group();
           group.add(object);
-          setModel(group);
+          if (isSubscribed) {
+            setModel(group);
+          }
         },
         undefined,
-        (error) => console.error(`Error loading ${obj_file_path}:`, error)
+        (error) => console.warn(`Error loading OBJ model ${sku_code}:`, error)
       );
     }
-  }, [obj_file_path, sku_code, category, width_in, depth_in, model_name]);
+    return () => { isSubscribed = false; };
+  }, [obj_file_path, sku_code, category, wIn, dIn, model_name]);
 
   const handleClick = (e) => {
     e.stopPropagation();
@@ -628,102 +729,115 @@ function OBJProduct({ placement, isSelected, onClick }) {
         onClick={handleClick}
       >
         <primitive object={model} />
-        {isCatalogueItem && (
+        {isCatalogueItem && !hideHotspots && (
           <OrangeHotspotStub
             position={[0, 22, 0]}
             placement={placement}
             isSelected={isSelected}
             onClick={() => onClick(placement)}
+            onCycleProduct={onCycleProduct}
+            hideHotspots={hideHotspots}
           />
         )}
       </group>
     );
   }
 
-  return null;
+  // Fallback to robust procedural 3D block if OBJ model is loading, null, or unavailable
+  return (
+    <SimpleProduct
+      placement={placement}
+      isSelected={isSelected}
+      onClick={onClick}
+      onCycleProduct={onCycleProduct}
+      hideHotspots={hideHotspots}
+    />
+  );
 }
 
-function SimpleProduct({ placement, isSelected, onClick }) {
+function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots }) {
   const { x, y, width_in, depth_in, model_name, is_platform, is_placeholder, platform_height_offset, rotation_deg, category } = placement;
 
-  const centerX = x + width_in / 2;
-  const centerZ = y + depth_in / 2;
+  let centerX = x + width_in / 2;
+  let centerZ = y + depth_in / 2;
+
+  // Lock counter platform center to washbasin center for exact 3D alignment
+  if (is_platform || (category || '').toLowerCase() === 'sink_platform' || (category || '').toLowerCase() === 'cabinet') {
+    const washbasinItem = layoutData?.find(p => (p.category || '').toLowerCase() === 'washbasin' || (p.category || '').toLowerCase() === 'wash_basin');
+    if (washbasinItem) {
+      const wbW = Number(washbasinItem.width_in) || 22;
+      const wbD = Number(washbasinItem.depth_in) || 18;
+      centerX = (Number(washbasinItem.x) || 0) + wbW / 2;
+      centerZ = (Number(washbasinItem.y) || 0) + wbD / 2;
+    }
+  }
+
   const platformOffset = platform_height_offset || 0;
-  const height = is_platform ? (placement.height_in || 12) : (is_placeholder ? 2 : 18);
-  const isCatalogueItem = ['toilet', 'toilet_seat', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
+  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
 
   const handleClick = (e) => {
     e.stopPropagation();
-    if (!is_platform && isCatalogueItem) {
+    if (isCatalogueItem) {
       onClick(placement);
     }
   };
 
-  if (is_platform) {
-    const countertopHeight = 1.5;
-    const cabinetHeight = Math.max(1, height - countertopHeight);
-    return (
-      <group
-        position={[centerX, platformOffset, centerZ]}
-        rotation={[0, ((rotation_deg || 0) * Math.PI) / 180, 0]}
-      >
-        {/* Off-White Cabinet Base */}
-        <mesh
-          position={[0, cabinetHeight / 2, 0]}
-          castShadow
-          receiveShadow
-        >
-          <boxGeometry args={[width_in, cabinetHeight, depth_in]} />
-          <meshStandardMaterial color="#F5F5F0" roughness={0.3} />
-        </mesh>
-        {/* Polished Black Granite / Marble Counter Top Slab */}
-        <mesh
-          position={[0, cabinetHeight + countertopHeight / 2, 0]}
-          castShadow
-          receiveShadow
-        >
-          <boxGeometry args={[width_in + 1.2, countertopHeight, depth_in + 1.2]} />
-          <meshStandardMaterial color="#111111" roughness={0.12} metalness={0.25} />
-        </mesh>
-      </group>
-    );
-  }
+  const isToilet = category === 'toilet';
+  const isWashbasin = category === 'washbasin' || category === 'wash_basin';
+  const isBathtub = category === 'bathtub';
+  const isDustbin = category === 'dustbin';
+  const isTowelBar = category === 'towel_bar';
 
-  const color = getProductColor(model_name);
+  let geom = <boxGeometry args={[width_in, 16, depth_in]} />;
+  let matColor = getProductColor(model_name);
+
+  if (is_platform) {
+    geom = <boxGeometry args={[width_in, 12, depth_in]} />;
+    matColor = "#1E293B";
+  } else if (isWashbasin) {
+    geom = <boxGeometry args={[width_in, 6, depth_in]} />;
+  } else if (isToilet) {
+    geom = <boxGeometry args={[width_in, 18, depth_in]} />;
+  } else if (isBathtub) {
+    geom = <boxGeometry args={[width_in, 20, depth_in]} />;
+  } else if (isDustbin) {
+    geom = <cylinderGeometry args={[width_in / 2, width_in / 2.2, 16, 20]} />;
+    matColor = "#475569";
+  } else if (isTowelBar) {
+    geom = <boxGeometry args={[width_in, 3, Math.max(2, depth_in)]} />;
+    matColor = "#94A3B8";
+  }
 
   return (
     <group
-      position={[centerX, platformOffset, centerZ]}
+      position={[centerX, platformOffset + (is_platform ? 6 : 9), centerZ]}
       rotation={[0, ((rotation_deg || 0) * Math.PI) / 180, 0]}
       onClick={handleClick}
     >
-      <mesh
-        position={[0, height / 2, 0]}
-        castShadow={!is_placeholder}
-        receiveShadow
-      >
-        <boxGeometry args={[width_in, height, depth_in]} />
+      <mesh castShadow receiveShadow>
+        {geom}
         <meshStandardMaterial
-          color={is_placeholder ? "#313B4A" : color}
-          transparent={is_placeholder}
-          opacity={is_placeholder ? 0.35 : 1.0}
+          color={matColor}
+          roughness={is_platform ? 0.4 : 0.15}
+          metalness={0.05}
         />
       </mesh>
-
-      {!is_placeholder && !is_platform && isCatalogueItem && (
+      {isCatalogueItem && !hideHotspots && (
         <OrangeHotspotStub
-          position={[0, height + 6, 0]}
+          position={[0, 22, 0]}
           placement={placement}
           isSelected={isSelected}
           onClick={() => onClick(placement)}
+          onCycleProduct={onCycleProduct}
+          hideHotspots={hideHotspots}
         />
       )}
     </group>
   );
 }
 
-// Smooth Time-Based Camera Animation Controller (Exact Negative-Velocity Trajectory Retracing)
-function CameraRig({ targetCamera, onResetComplete }) {
+// Smooth Time-Based Camera Animation Controller
+function CameraRig({ targetCamera, defaultOrbitTarget, defaultCameraPos, onResetComplete }) {
   const { camera, controls } = useThree();
   const animRef = useRef(null);
 
@@ -743,7 +857,7 @@ function CameraRig({ targetCamera, onResetComplete }) {
         };
       } else {
         const activeControls = controls || camera.controls;
-        const currentTarget = activeControls?.target ? activeControls.target.clone() : new THREE.Vector3();
+        const currentTarget = activeControls?.target ? activeControls.target.clone() : defaultOrbitTarget.clone();
         animRef.current = {
           startPos: camera.position.clone(),
           startTarget: currentTarget,
@@ -755,7 +869,7 @@ function CameraRig({ targetCamera, onResetComplete }) {
         };
       }
     }
-  }, [targetCamera, camera, controls]);
+  }, [targetCamera, camera, controls, defaultOrbitTarget]);
 
   useFrame(() => {
     if (!animRef.current) return;
@@ -764,12 +878,7 @@ function CameraRig({ targetCamera, onResetComplete }) {
     const elapsed = performance.now() - startTime;
     const progress = Math.min(1, Math.max(0, elapsed / duration));
 
-    // Evaluate parameter t along the IN trajectory:
-    // Going IN: t goes 0 -> 1 (startPos -> endPos)
-    // Going OUT: t goes 1 -> 0 (endPos -> startPos, exact negative velocity retracing!)
     const t = isResetting ? (1 - progress) : progress;
-
-    // Smooth cubic ease-in-out curve
     const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
     camera.position.lerpVectors(startPos, endPos, easeT);
@@ -783,6 +892,10 @@ function CameraRig({ targetCamera, onResetComplete }) {
     if (progress >= 1) {
       animRef.current = null;
       if (isResetting) {
+        if (activeControls && activeControls.target) {
+          activeControls.target.copy(startTarget);
+          activeControls.update();
+        }
         onResetComplete?.();
       }
     }
@@ -792,14 +905,23 @@ function CameraRig({ targetCamera, onResetComplete }) {
 }
 
 // Sub-component inside Canvas to access Three.js camera & controls refs
-function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, selectedSku, customCameraTarget, handleSelectProduct, onResetComplete }) {
+function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, floorTheme, wallTheme, isZoomLocked, selectedCategory, selectedSku, customCameraTarget, handleSelectProduct, onCycleProduct, onResetComplete, hideHotspots }) {
   const { camera, controls } = useThree();
 
   const washbasinPlacement = layoutData.find(p => p.category === 'washbasin' || p.category === 'wash_basin');
+  const cabinetPlacement = layoutData.find(p => p.category === 'sink_platform' || p.category === 'cabinet');
   const doorPlacement = layoutData.find(p => p.category === 'door');
   const windowPlacement = layoutData.find(p => p.category === 'window');
+  const mirrorPlacement = layoutData.find(p => p.category === 'mirror');
 
-  const defaultOrbitTarget = useMemo(() => new THREE.Vector3(roomWidthIn / 2, 42, roomDepthIn / 2 - 1), [roomWidthIn, roomDepthIn]);
+  const defaultOrbitTarget = useMemo(() => {
+    return new THREE.Vector3(roomWidthIn / 2, 26, roomDepthIn / 2);
+  }, [roomWidthIn, roomDepthIn]);
+
+  const defaultCameraPos = useMemo(() => {
+    return new THREE.Vector3(roomWidthIn / 2, 105, roomDepthIn * 2.2);
+  }, [roomWidthIn, roomDepthIn]);
+
   const isInspecting = customCameraTarget && !customCameraTarget.isResetting;
 
   return (
@@ -825,20 +947,28 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, se
         shadow-mapSize-height={2048}
       />
 
-      <Floor width={roomWidthIn} depth={roomDepthIn} theme={aestheticTheme} />
+      <Floor width={roomWidthIn} depth={roomDepthIn} floorTheme={floorTheme || aestheticTheme} />
       <RoomWalls
         width={roomWidthIn}
         depth={roomDepthIn}
         theme={aestheticTheme}
+        wallTheme={wallTheme}
+        wallSide={THREE.FrontSide}
         washbasinPlacement={washbasinPlacement}
+        cabinetPlacement={cabinetPlacement}
         doorPlacement={doorPlacement}
         windowPlacement={windowPlacement}
+        mirrorPlacement={mirrorPlacement}
       />
 
       {layoutData.map((placement, idx) => {
-        if (placement.category === 'faucet' || placement.category === 'door' || placement.category === 'window') return null;
+        if (placement.category === 'faucet' || placement.category === 'door' || placement.category === 'window' || placement.category === 'mirror' || placement.category === 'toilet_seat') return null;
         const hasOBJ = placement.obj_file_path && placement.has_3d_model;
-        const isSelected = selectedSku === placement.sku_code;
+
+        const pCat = (placement.category || "").toLowerCase().replace("wash_basin", "washbasin");
+        const isSelected = selectedCategory
+          ? pCat === selectedCategory
+          : selectedSku === placement.sku_code;
 
         let itemRot = placement.rotation_deg || 0;
         if (!placement.rotation_deg) {
@@ -864,6 +994,9 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, se
             placement={placementWithRot}
             isSelected={isSelected}
             onClick={(p) => handleSelectProduct(p, camera, controls)}
+            onCycleProduct={onCycleProduct}
+            layoutData={layoutData}
+            hideHotspots={hideHotspots}
           />
         ) : (
           <SimpleProduct
@@ -871,12 +1004,17 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, se
             placement={placementWithRot}
             isSelected={isSelected}
             onClick={(p) => handleSelectProduct(p, camera, controls)}
+            onCycleProduct={onCycleProduct}
+            layoutData={layoutData}
+            hideHotspots={hideHotspots}
           />
         );
       })}
 
       <CameraRig
         targetCamera={customCameraTarget}
+        defaultOrbitTarget={defaultOrbitTarget}
+        defaultCameraPos={defaultCameraPos}
         onResetComplete={onResetComplete}
       />
 
@@ -884,12 +1022,12 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, se
         makeDefault
         target={isInspecting ? customCameraTarget.target : defaultOrbitTarget}
         autoRotate={false}
-        enableZoom={false}
+        enableZoom={!isInspecting && !isZoomLocked}
         enablePan={false}
         enableRotate={!isInspecting}
         rotateSpeed={-0.5}
-        minDistance={0.5}
-        maxDistance={350}
+        minDistance={10}
+        maxDistance={450}
         minPolarAngle={0.05}
         maxPolarAngle={Math.PI / 2 + 0.1}
       />
@@ -897,8 +1035,10 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, se
   );
 }
 
-export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aestheticTheme, onProductClick }) {
+export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomHeight, aestheticTheme, floorTheme, wallTheme, onProductClick, onCycleProduct, hideHotspots }) {
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedSku, setSelectedSku] = useState(null);
+  const [isZoomLocked, setIsZoomLocked] = useState(false);
   const [customCameraTarget, setCustomCameraTarget] = useState(null);
   const inspectionPathRef = useRef(null);
 
@@ -919,19 +1059,26 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
   const roomWidthIn = roomWidth * 12;
   const roomDepthIn = roomDepth * 12;
 
-  const defaultCameraPos = useMemo(() => new THREE.Vector3(roomWidthIn / 2, 42, roomDepthIn / 2), [roomWidthIn, roomDepthIn]);
-  const defaultOrbitTarget = useMemo(() => new THREE.Vector3(roomWidthIn / 2, 42, roomDepthIn / 2 - 1), [roomWidthIn, roomDepthIn]);
+  const defaultCameraPos = useMemo(() => {
+    return new THREE.Vector3(roomWidthIn / 2, 105, roomDepthIn * 2.2);
+  }, [roomWidthIn, roomDepthIn]);
+
+  const defaultOrbitTarget = useMemo(() => {
+    return new THREE.Vector3(roomWidthIn / 2, 26, roomDepthIn / 2);
+  }, [roomWidthIn, roomDepthIn]);
 
   const handleResetCamera = () => {
-    setSelectedSku(null);
-    const restorePos = inspectionPathRef.current?.startPos || defaultCameraPos;
-    const restoreTarget = inspectionPathRef.current?.startTarget || defaultOrbitTarget;
+    const path = inspectionPathRef.current;
+    const targetPos = path ? path.startPos : defaultCameraPos;
+    const targetOrbit = path ? path.startTarget : defaultOrbitTarget;
 
+    setSelectedCategory(null);
+    setSelectedSku(null);
     setCustomCameraTarget({
-      pos: restorePos,
-      target: restoreTarget,
+      pos: targetPos,
+      target: targetOrbit,
       isResetting: true,
-      inspectionPath: inspectionPathRef.current,
+      inspectionPath: path,
     });
     onProductClick?.(null);
   };
@@ -940,7 +1087,9 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
     const isCatalogueItem = ['toilet', 'toilet_seat', 'washbasin', 'wash_basin', 'bathtub'].includes((product.category || '').toLowerCase());
     if (!isCatalogueItem) return;
 
-    if (selectedSku === product.sku_code) {
+    const normCat = (product.category || "").toLowerCase().replace("wash_basin", "washbasin");
+
+    if (selectedCategory === normCat) {
       handleResetCamera();
       return;
     }
@@ -952,7 +1101,6 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
 
     let target = new THREE.Vector3(cX, pOffset + 12, cZ);
 
-    // Calculate nearest wall to position camera in front of the fixture from inside the room
     const distBack = cZ;
     const distFront = roomDepthIn - cZ;
     const distLeft = cX;
@@ -960,26 +1108,23 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
     const minDist = Math.min(distBack, distFront, distLeft, distRight);
 
     let pos;
-    const camOffsetDist = cat === 'bathtub' ? 36 : 28;
-    const eyeHeight = pOffset + (cat === 'bathtub' ? 32 : 26);
+    const camOffsetDist = cat === 'bathtub' ? 82 : 44;
+    const eyeHeight = pOffset + (cat === 'bathtub' ? 38 : 24);
 
     if (minDist === distFront) {
-      // Front Wall (near door): Front faces -Z into room
       pos = new THREE.Vector3(cX, eyeHeight, Math.max(12, cZ - camOffsetDist));
     } else if (minDist === distLeft) {
-      // Left Wall: Front faces +X into room
       pos = new THREE.Vector3(Math.min(roomWidthIn - 12, cX + camOffsetDist), eyeHeight, cZ);
     } else if (minDist === distRight) {
-      // Right Wall: Front faces -X into room
       pos = new THREE.Vector3(Math.max(12, cX - camOffsetDist), eyeHeight, cZ);
     } else {
-      // Back Wall (default): Front faces +Z into room
       pos = new THREE.Vector3(cX, eyeHeight, Math.min(roomDepthIn - 12, cZ + camOffsetDist));
     }
 
-    // Save exact inspection trajectory path (start -> end)
-    const startPos = camera ? camera.position.clone() : defaultCameraPos.clone();
-    const startTarget = (controls && controls.target) ? controls.target.clone() : defaultOrbitTarget.clone();
+    // Preserve the original pre-inspection camera angle & distance
+    const prevPath = inspectionPathRef.current;
+    const startPos = prevPath ? prevPath.startPos : (camera ? camera.position.clone() : defaultCameraPos.clone());
+    const startTarget = prevPath ? prevPath.startTarget : ((controls && controls.target) ? controls.target.clone() : defaultOrbitTarget.clone());
 
     inspectionPathRef.current = {
       startPos,
@@ -988,6 +1133,7 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
       endTarget: target,
     };
 
+    setSelectedCategory(normCat);
     setSelectedSku(product.sku_code);
     setCustomCameraTarget({
       pos,
@@ -1004,19 +1150,22 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
     container: {
       display: "flex",
       flexDirection: "column",
-      height: "100%",
+      height: "750px",
+      minHeight: "750px",
       width: "100%",
       position: "relative",
-      backgroundColor: "#0B132B",
+      backgroundColor: "#08090C",
     },
     canvas: {
-      flex: 1,
+      flex: "1 1 auto",
       width: "100%",
+      height: "700px",
+      minHeight: "700px",
     },
     controls: {
       padding: "12px 24px",
-      backgroundColor: "#1C2541",
-      borderTop: `2px solid ${ORANGE}`,
+      backgroundColor: "#10141D",
+      borderTop: `2px solid #DA9D49`,
       fontSize: "0.85rem",
       color: "#94A3B8",
     },
@@ -1031,8 +1180,8 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
       <Canvas
         style={styles.canvas}
         camera={{
-          position: [roomWidthIn / 2, 42, roomDepthIn / 2],
-          fov: 65,
+          position: [defaultCameraPos.x, defaultCameraPos.y, defaultCameraPos.z],
+          fov: 55,
         }}
         shadows
       >
@@ -1041,55 +1190,193 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, aesth
           roomWidthIn={roomWidthIn}
           roomDepthIn={roomDepthIn}
           aestheticTheme={aestheticTheme}
+          floorTheme={floorTheme}
+          wallTheme={wallTheme}
+          isZoomLocked={isZoomLocked}
+          selectedCategory={selectedCategory}
           selectedSku={selectedSku}
           customCameraTarget={customCameraTarget}
           handleSelectProduct={handleSelectProduct}
-          onResetComplete={() => setCustomCameraTarget(null)}
+          onCycleProduct={onCycleProduct}
+          onResetComplete={() => {
+            setCustomCameraTarget(null);
+            inspectionPathRef.current = null;
+          }}
+          hideHotspots={hideHotspots}
         />
       </Canvas>
 
-      {/* Floating Semi-Transparent Reset View Button (Bottom Right) */}
-      {customCameraTarget && (
-        <button
-          type="button"
-          onClick={handleResetCamera}
-          style={{
-            position: "absolute",
-            bottom: "60px",
-            right: "24px",
-            zIndex: 10,
-            backgroundColor: "rgba(15, 23, 42, 0.75)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-            color: "#FFFFFF",
-            border: "1px solid rgba(217, 126, 58, 0.7)",
-            borderRadius: "8px",
-            padding: "8px 16px",
-            fontSize: "0.85rem",
-            fontWeight: "700",
-            cursor: "pointer",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(217, 126, 58, 0.85)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(15, 23, 42, 0.75)";
-          }}
-        >
-          ↺ Reset View
-        </button>
+      {/* Floating Left & Right Screen Orange Arrows to Cycle Product Designs */}
+      {selectedCategory && !hideHotspots && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCycleProduct?.(selectedCategory, -1);
+            }}
+            title="Previous Design"
+            style={{
+              position: "absolute",
+              left: "24px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 25,
+              width: "56px",
+              height: "56px",
+              borderRadius: "50%",
+              backgroundColor: "#D97E3A",
+              color: "#FFFFFF",
+              border: "2.5px solid #FFD166",
+              cursor: "pointer",
+              fontSize: "2.2rem",
+              fontWeight: "900",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 6px 24px rgba(217, 126, 58, 0.7), 0 0 20px rgba(0,0,0,0.8)",
+              transition: "all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+              userSelect: "none",
+              outline: "none",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1.14)";
+              e.currentTarget.style.backgroundColor = "#F5B054";
+              e.currentTarget.style.boxShadow = "0 8px 30px rgba(245, 176, 84, 0.9)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+              e.currentTarget.style.backgroundColor = "#D97E3A";
+              e.currentTarget.style.boxShadow = "0 6px 24px rgba(217, 126, 58, 0.7)";
+            }}
+          >
+            ‹
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCycleProduct?.(selectedCategory, 1);
+            }}
+            title="Next Design"
+            style={{
+              position: "absolute",
+              right: "24px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 25,
+              width: "56px",
+              height: "56px",
+              borderRadius: "50%",
+              backgroundColor: "#D97E3A",
+              color: "#FFFFFF",
+              border: "2.5px solid #FFD166",
+              cursor: "pointer",
+              fontSize: "2.2rem",
+              fontWeight: "900",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 6px 24px rgba(217, 126, 58, 0.7), 0 0 20px rgba(0,0,0,0.8)",
+              transition: "all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+              userSelect: "none",
+              outline: "none",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1.14)";
+              e.currentTarget.style.backgroundColor = "#F5B054";
+              e.currentTarget.style.boxShadow = "0 8px 30px rgba(245, 176, 84, 0.9)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+              e.currentTarget.style.backgroundColor = "#D97E3A";
+              e.currentTarget.style.boxShadow = "0 6px 24px rgba(217, 126, 58, 0.7)";
+            }}
+          >
+            ›
+          </button>
+        </>
       )}
 
-      {/* Controls Footer */}
-      <div style={styles.controls}>
-        <p style={styles.controlsText}>
-          {isInspecting
-            ? "Inspecting Fixture (Camera Locked) • Click Reset View button (bottom-right) to return to previous orientation"
-            : "Free 360° Room Rotation • Drag mouse to rotate • Click pulsating stubs to inspect fixture"}
-        </p>
-      </div>
+      {/* Floating Action Button Group (Bottom Right) */}
+      {!hideHotspots && (
+        <div style={{
+          position: "absolute",
+          bottom: "55px",
+          right: "24px",
+          zIndex: 10,
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          alignItems: "flex-end",
+        }}>
+          {/* Lock Zoom Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsZoomLocked(!isZoomLocked)}
+            style={{
+              backgroundColor: isZoomLocked ? "#DA9D49" : "rgba(16, 20, 29, 0.9)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              color: isZoomLocked ? "#08090C" : "#DA9D49",
+              border: "1.5px solid #DA9D49",
+              borderRadius: "8px",
+              padding: "9px 18px",
+              fontSize: "0.85rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
+              transition: "all 0.25s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+            onMouseEnter={(e) => {
+              if (!isZoomLocked) {
+                e.currentTarget.style.backgroundColor = "#DA9D49";
+                e.currentTarget.style.color = "#08090C";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isZoomLocked) {
+                e.currentTarget.style.backgroundColor = "rgba(16, 20, 29, 0.9)";
+                e.currentTarget.style.color = "#DA9D49";
+              }
+            }}
+          >
+            {isZoomLocked ? "Zoom Locked" : "Lock Zoom"}
+          </button>
+
+          {/* Reset View Button */}
+          <button
+            type="button"
+            onClick={handleResetCamera}
+            style={{
+              backgroundColor: "rgba(15, 23, 42, 0.85)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              color: "#FFFFFF",
+              border: "1px solid rgba(217, 126, 58, 0.7)",
+              borderRadius: "8px",
+              padding: "8px 16px",
+              fontSize: "0.85rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(217, 126, 58, 0.85)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(15, 23, 42, 0.85)";
+            }}
+          >
+            Reset View
+          </button>
+        </div>
+      )}
     </div>
   );
 }

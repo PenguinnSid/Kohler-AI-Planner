@@ -10,7 +10,7 @@ export default function DesignForm({ onSubmit }) {
   const [form, setForm] = useState({
     room_width_ft: 8,
     room_depth_ft: 6,
-    budget_inr: 200000,
+    budget_inr: 0,
     aesthetic_theme: "Minimalist Modern",
     cohesion_score: 0.5,
   });
