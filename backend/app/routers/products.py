@@ -20,7 +20,17 @@ def list_products(
 ):
     query = db.query(Product)
     if category:
-        query = query.filter(Product.category == category)
+        c_lower = category.lower().strip()
+        if c_lower in ["washbasin", "wash_basin", "sink"]:
+            query = query.filter(Product.category.in_(["washbasin", "wash_basin"]))
+        elif c_lower in ["bathtub", "bath_tub", "bath"]:
+            query = query.filter(Product.category.in_(["bathtub", "bath_tub"]))
+        elif c_lower in ["towel_arm", "towel_bar", "towel"]:
+            query = query.filter(Product.category.in_(["towel_arm", "towel_bar"]))
+        elif c_lower in ["toilet", "toilets"]:
+            query = query.filter(Product.category.in_(["toilet", "toilet_seat"]))
+        else:
+            query = query.filter(Product.category.ilike(f"%{c_lower}%"))
     if max_price:
         query = query.filter(Product.price_inr <= max_price)
     return query.all()

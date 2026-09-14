@@ -184,6 +184,153 @@ export function adjustMirrorForWindowOverlap(items, roomWidthIn, roomDepthIn) {
   return items;
 }
 
+function findEmptySpaceForItem(item, itemKey, existingPlaced, roomWidthIn, roomDepthIn) {
+  const step = 6;
+  const candidatePositions = [];
+
+  if (itemKey === "bathtub") {
+    candidatePositions.push({ x: 4, y: 4, rot: 0, wallSnapSide: "top" });
+    candidatePositions.push({ x: roomWidthIn - item.w - 4, y: 4, rot: 0, wallSnapSide: "top" });
+    candidatePositions.push({ x: 4, y: roomDepthIn - item.h - 4, rot: 0, wallSnapSide: "bottom" });
+    candidatePositions.push({ x: roomWidthIn - item.w - 4, y: roomDepthIn - item.h - 4, rot: 0, wallSnapSide: "bottom" });
+  } else if (itemKey === "washbasin") {
+    for (let x = 4; x <= roomWidthIn - item.w - 4; x += step) {
+      candidatePositions.push({ x, y: 4, rot: 0, wallSnapSide: "top" });
+    }
+    for (let y = 4; y <= roomDepthIn - item.h - 4; y += step) {
+      candidatePositions.push({ x: roomWidthIn - item.w - 4, y, rot: 270, wallSnapSide: "right" });
+      candidatePositions.push({ x: 4, y, rot: 90, wallSnapSide: "left" });
+    }
+    for (let x = 4; x <= roomWidthIn - item.w - 4; x += step) {
+      candidatePositions.push({ x, y: roomDepthIn - item.h - 4, rot: 180, wallSnapSide: "bottom" });
+    }
+  } else if (itemKey === "toilet") {
+    for (let x = 4; x <= roomWidthIn - item.w - 4; x += step) {
+      candidatePositions.push({ x, y: roomDepthIn - item.h - 4, rot: 180, wallSnapSide: "bottom" });
+    }
+    for (let y = 4; y <= roomDepthIn - item.h - 4; y += step) {
+      candidatePositions.push({ x: 4, y, rot: 90, wallSnapSide: "left" });
+      candidatePositions.push({ x: roomWidthIn - item.w - 4, y, rot: 270, wallSnapSide: "right" });
+    }
+    for (let x = 4; x <= roomWidthIn - item.w - 4; x += step) {
+      candidatePositions.push({ x, y: 4, rot: 0, wallSnapSide: "top" });
+    }
+  } else {
+    for (let y = 0; y <= roomDepthIn - item.h; y += step) {
+      for (let x = 0; x <= roomWidthIn - item.w; x += step) {
+        candidatePositions.push({ x, y });
+      }
+    }
+  }
+
+  for (const pos of candidatePositions) {
+    if (pos.x < 0 || pos.y < 0 || (pos.x + item.w) > roomWidthIn || (pos.y + item.h) > roomDepthIn) {
+      continue;
+    }
+    const testItem = { ...item, ...pos };
+    const testState = { ...existingPlaced, [itemKey]: testItem };
+
+    if (!hasIllegalOverlap(testState, roomWidthIn, roomDepthIn)) {
+      return pos;
+    }
+  }
+  return null;
+}
+
+export function autoArrangeLayout(currentItems, roomWidthIn, roomDepthIn, mode = "shower") {
+  let itemsCopy = { ...currentItems };
+
+  if (mode === "shower") {
+    delete itemsCopy.bathtub;
+  } else if (mode === "bathtub" && !itemsCopy.bathtub) {
+    itemsCopy.bathtub = {
+      x: 4,
+      y: 4,
+      w: 50,
+      h: 28,
+      heightIn: 22,
+      rot: 0,
+      label: "Bathtub / Shower",
+      color: "#8B5CF6",
+      minW: 30,
+      maxW: 78,
+      minH: 28,
+      maxH: 72,
+      category: "bathtub",
+      wallSnapSide: "top",
+    };
+  }
+
+  const placementOrder = ["door", "window", "bathtub", "washbasin", "cabinet", "mirror", "toilet", "towel_bar", "dustbin"];
+  const placedState = {};
+  const unfittedKeys = [];
+
+  for (const key of placementOrder) {
+    if (!itemsCopy[key]) continue;
+    const item = itemsCopy[key];
+
+    if (key === "cabinet" && placedState.washbasin) {
+      const cabW = placedState.washbasin.w + 6;
+      const cabH = placedState.washbasin.h + 6;
+      const cabX = Math.max(0, placedState.washbasin.x - 3);
+      const cabY = Math.max(0, placedState.washbasin.y - 3);
+      placedState.cabinet = {
+        ...item,
+        x: cabX,
+        y: cabY,
+        w: cabW,
+        h: cabH,
+        rot: placedState.washbasin.rot,
+        wallSnapSide: placedState.washbasin.wallSnapSide,
+      };
+      continue;
+    }
+
+    if (key === "mirror" && placedState.washbasin) {
+      const mirX = Math.max(0, Math.min(roomWidthIn - item.w, placedState.washbasin.x));
+      const mirY = placedState.washbasin.wallSnapSide === "bottom" ? Math.max(0, roomDepthIn - item.h) : 0;
+      placedState.mirror = {
+        ...item,
+        x: mirX,
+        y: mirY,
+        wallSnapSide: placedState.washbasin.wallSnapSide || "top",
+      };
+      continue;
+    }
+
+    const fitsAsIs = !hasIllegalOverlap({ ...placedState, [key]: item }, roomWidthIn, roomDepthIn) &&
+      item.x >= 0 && item.y >= 0 && (item.x + item.w) <= roomWidthIn && (item.y + item.h) <= roomDepthIn;
+
+    if (fitsAsIs) {
+      placedState[key] = { ...item };
+      continue;
+    }
+
+    const newPos = findEmptySpaceForItem(item, key, placedState, roomWidthIn, roomDepthIn);
+    if (newPos) {
+      placedState[key] = { ...item, ...newPos };
+    } else {
+      unfittedKeys.push(key);
+    }
+  }
+
+  for (const unfittedKey of unfittedKeys) {
+    if (["towel_bar", "dustbin", "cabinet"].includes(unfittedKey)) {
+      delete placedState[unfittedKey];
+    }
+  }
+
+  let warningMsg = null;
+  const majorUnfitted = unfittedKeys.filter((k) => !["towel_bar", "dustbin", "cabinet"].includes(k));
+
+  if (majorUnfitted.length > 0) {
+    const labels = majorUnfitted.map((k) => itemsCopy[k]?.label || k).join(", ");
+    warningMsg = `Warning: Room dimensions (${Math.round(roomWidthIn / 12)}' × ${Math.round(roomDepthIn / 12)}') are too small to fit: ${labels}. Please expand room size or adjust layout.`;
+  }
+
+  return { arrangedItems: placedState, warningMsg };
+}
+
 export default function LayoutPlanner2D({
   roomWidthFt = 8,
   setRoomWidthFt,
@@ -191,7 +338,7 @@ export default function LayoutPlanner2D({
   setRoomDepthFt,
   roomHeightFt = 9,
   setRoomHeightFt,
-  budgetInr = 0,
+  budgetInr = "",
   setBudgetInr,
   aestheticTheme = "Minimalist Modern",
   setAestheticTheme,
@@ -199,9 +346,12 @@ export default function LayoutPlanner2D({
   wallTheme = "subway",
   onFloorThemeChange,
   onWallThemeChange,
+  bathSectionMode = "shower",
+  setBathSectionMode,
   itemsState,
   onItemsStateChange,
   onReset,
+  onReloadGeneration,
 }) {
   const roomWidthIn = Math.max(36, roomWidthFt * 12);
   const roomDepthIn = Math.max(36, roomDepthFt * 12);
@@ -285,6 +435,7 @@ export default function LayoutPlanner2D({
   const [showClearances, setShowClearances] = useState(true);
   const [showPlumbing, setShowPlumbing] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(true);
+  const [fitWarning, setFitWarning] = useState(null);
 
   // Default fixture state dictionary (in inches)
   const defaultItems = {
@@ -303,6 +454,24 @@ export default function LayoutPlanner2D({
   const updateItemsState = (nextState) => {
     const adjusted = adjustMirrorForWindowOverlap(nextState, roomWidthIn, roomDepthIn);
     onItemsStateChange?.(adjusted);
+  };
+
+  const handleBathModeSwitch = (newMode) => {
+    setBathSectionMode?.(newMode);
+    const { arrangedItems, warningMsg } = autoArrangeLayout(items || defaultItems, roomWidthIn, roomDepthIn, newMode);
+    updateItemsState(arrangedItems);
+
+    const userBudget = Number(budgetInr);
+    if (newMode === "bathtub" && userBudget > 0 && userBudget < 34000) {
+      setFitWarning(`Warning: Bathtub fixture (₹34,000) exceeds specified budget of ₹${userBudget.toLocaleString("en-IN")}.`);
+    } else {
+      setFitWarning(warningMsg);
+    }
+  };
+
+  const handleReloadGeneration = () => {
+    // Reload 3D scene & product bundle with respect to changes in 2D layout (without resetting 2D layout positions)
+    onReloadGeneration?.();
   };
 
   // Drag start handler
@@ -580,24 +749,64 @@ export default function LayoutPlanner2D({
           </h3>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onReset?.()}
-          style={{
-            padding: "6px 14px",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            border: `1px solid ${GOLD}`,
-            color: GOLD,
-            borderRadius: "6px",
-            fontSize: "0.8rem",
-            fontWeight: "600",
-            cursor: "pointer",
-            marginRight: "54px",
-          }}
-        >
-          Reset Layout
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={handleReloadGeneration}
+            style={{
+              padding: "6px 14px",
+              backgroundColor: GOLD,
+              border: `1px solid ${GOLD}`,
+              color: "#08090C",
+              borderRadius: "6px",
+              fontSize: "0.8rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+            }}
+          >
+            Reload Generation
+          </button>
+          <button
+            type="button"
+            onClick={() => onReset?.()}
+            style={{
+              padding: "6px 14px",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              border: `1px solid ${GOLD}`,
+              color: GOLD,
+              borderRadius: "6px",
+              fontSize: "0.8rem",
+              fontWeight: "600",
+              cursor: "pointer",
+              marginRight: "54px",
+            }}
+          >
+            Reset Layout
+          </button>
+        </div>
       </div>
+
+      {/* Fit Warning Alert Message */}
+      {fitWarning && (
+        <div style={{
+          backgroundColor: "rgba(239, 68, 68, 0.18)",
+          border: "1.5px solid #EF4444",
+          borderRadius: "8px",
+          padding: "10px 16px",
+          marginBottom: "16px",
+          color: "#FCA5A5",
+          fontSize: "0.85rem",
+          fontWeight: "700",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          boxShadow: "0 4px 12px rgba(239, 68, 68, 0.25)",
+        }}>
+          <span style={{ fontSize: "1.2rem" }}>⚠️</span>
+          <span>{fitWarning}</span>
+        </div>
+      )}
 
       {/* Side-by-Side Main Grid: 2D Canvas & Tool Dimensions Left, Room Specs & Controls Right */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "24px", alignItems: "start" }}>
@@ -1028,6 +1237,56 @@ export default function LayoutPlanner2D({
         {/* Right Column: Controls Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
+          {/* Bath Section Setup Options (Walk-In Shower Enclosure vs Bathtub Zone) */}
+          <div style={{
+            padding: "16px",
+            backgroundColor: "rgba(10, 14, 24, 0.35)",
+            borderRadius: "10px",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+          }}>
+            <div style={{ fontSize: "0.78rem", fontWeight: "800", color: "#FFFFFF", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+              Bath Section Setup
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => handleBathModeSwitch("shower")}
+                style={{
+                  padding: "9px 12px",
+                  backgroundColor: bathSectionMode === "shower" ? "#D97E3A" : "rgba(0, 0, 0, 0.4)",
+                  color: "#FFFFFF",
+                  border: bathSectionMode === "shower" ? "1.5px solid #FFD166" : "1px solid rgba(255, 255, 255, 0.2)",
+                  borderRadius: "6px",
+                  fontSize: "0.78rem",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow: bathSectionMode === "shower" ? "0 4px 12px rgba(217, 126, 58, 0.4)" : "none",
+                }}
+              >
+                Shower Enclosure
+              </button>
+              <button
+                type="button"
+                onClick={() => handleBathModeSwitch("bathtub")}
+                style={{
+                  padding: "9px 12px",
+                  backgroundColor: bathSectionMode === "bathtub" ? "#D97E3A" : "rgba(0, 0, 0, 0.4)",
+                  color: "#FFFFFF",
+                  border: bathSectionMode === "bathtub" ? "1.5px solid #FFD166" : "1px solid rgba(255, 255, 255, 0.2)",
+                  borderRadius: "6px",
+                  fontSize: "0.78rem",
+                  fontWeight: "800",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow: bathSectionMode === "bathtub" ? "0 4px 12px rgba(217, 126, 58, 0.4)" : "none",
+                }}
+              >
+                Bathtub Zone
+              </button>
+            </div>
+          </div>
+
           {/* Add Basic Elements Menu */}
           <div style={{
             padding: "16px",
@@ -1164,8 +1423,9 @@ export default function LayoutPlanner2D({
                     type="number"
                     step="10000"
                     min="0"
-                    value={budgetInr ?? 0}
-                    onChange={(e) => setBudgetInr(parseInt(e.target.value) || 0)}
+                    value={budgetInr === 0 || budgetInr === null || budgetInr === undefined ? "" : budgetInr}
+                    onChange={(e) => setBudgetInr?.(e.target.value)}
+                    placeholder="Enter budget in INR"
                     style={{
                       width: "100%",
                       padding: "6px 10px",

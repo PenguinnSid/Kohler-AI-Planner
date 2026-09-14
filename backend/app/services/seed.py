@@ -17,28 +17,41 @@ def seed_from_csv(db) -> int:
             sku = row["sku_code"].strip()
             if not sku:
                 continue
-                
+
+            cat = row["category"].strip()
+            subcat = row.get("subcategory", "").strip() if row.get("subcategory") else None
+            col = row.get("colour", "").strip() if row.get("colour") else None
+
+            obj_file = os.path.join(MODELS_DIR, f"{sku}.obj")
+            has_3d = os.path.exists(obj_file)
+            obj_path = f"3d_files/{sku}.obj" if has_3d else None
+
             existing = db.query(Product).filter_by(sku_code=sku).first()
             if existing:
+                existing.category = cat
+                existing.subcategory = subcat
+                existing.colour = col
+                existing.model_name = row["model_name"].strip()
+                existing.description = row.get("description", "").strip() if row.get("description") else None
+                existing.price_inr = float(row["price_inr"]) if row.get("price_inr") else existing.price_inr
+                if row.get("height_in"): existing.height_in = float(row["height_in"])
+                if row.get("width_in"): existing.width_in = float(row["width_in"])
+                if row.get("depth_in"): existing.depth_in = float(row["depth_in"])
+                if row.get("style_tags"): existing.style_tags = [t.strip() for t in row["style_tags"].split(";")]
+                existing.has_3d_model = has_3d
+                existing.obj_file_path = obj_path
                 continue
 
-            raw_cat = row["category"].strip()
-            cat = "washbasin" if raw_cat == "wash_basin" else raw_cat
-
-            # Check if OBJ file exists for this product (faucets excluded)
-            if cat == "faucet":
-                has_3d = False
-                obj_path = None
-            else:
-                obj_file = os.path.join(MODELS_DIR, f"{sku}.obj")
-                has_3d = os.path.exists(obj_file)
-                obj_path = f"3d_files/{sku}.obj" if has_3d else None
+            # Check if OBJ file exists for this product
+            obj_file = os.path.join(MODELS_DIR, f"{sku}.obj")
+            has_3d = os.path.exists(obj_file)
+            obj_path = f"3d_files/{sku}.obj" if has_3d else None
 
             db.add(Product(
                 id=sku,
                 sku_code=sku,
                 category=cat,
-                subcategory=row.get("subcategory", "").strip() or None if row.get("subcategory") else None,
+                subcategory=subcat,
                 model_name=row["model_name"].strip(),
                 description=row.get("description", "").strip() or None if row.get("description") else None,
                 price_inr=float(row["price_inr"]) if row.get("price_inr") else 0.0,
@@ -46,6 +59,7 @@ def seed_from_csv(db) -> int:
                 height_in=float(row["height_in"]) if row.get("height_in") else None,
                 width_in=float(row["width_in"]) if row.get("width_in") else None,
                 depth_in=float(row["depth_in"]) if row.get("depth_in") else None,
+                colour=col,
                 has_3d_model=has_3d,
                 obj_file_path=obj_path,
             ))

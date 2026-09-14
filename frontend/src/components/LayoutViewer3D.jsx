@@ -9,13 +9,35 @@ const ORANGE = "#D97E3A";
 const DARK_ORANGE = "#B86A2A";
 const WHITE = "#FFFFFF";
 
-// Product finish mapper: Pristine Pure White porcelain by default, Dark Turquoise for ModernLife Edge sink
-function getProductColor(modelName) {
-  const name = (modelName || "").toLowerCase();
-  if (name.includes("modernlife") || name.includes("21226")) {
-    return "#0F4C5C"; // Dark Turquoise accent
+// Product finish & PBR material mapper based on Kohler catalogue colours and finishes
+export function getProductMaterialProps(placement) {
+  if (!placement) return { color: "#FFFFFF", roughness: 0.15, metalness: 0.05 };
+
+  const colorStr = (placement.colour || placement.color || placement.model_name || placement.sku_code || "").toLowerCase();
+
+  if (colorStr.includes("honed_black") || colorStr.includes("matte_black") || colorStr.includes("black")) {
+    return { color: "#18181B", roughness: 0.45, metalness: 0.1 };
   }
-  return "#FFFFFF"; // High-gloss Kohler Pure White Porcelain
+  if (colorStr.includes("brushed_bronze") || colorStr.includes("bronze")) {
+    return { color: "#A76D38", roughness: 0.25, metalness: 0.85 };
+  }
+  if (colorStr.includes("gold")) {
+    return { color: "#E2B04E", roughness: 0.2, metalness: 0.9 };
+  }
+  if (colorStr.includes("polished_chrome") || colorStr.includes("chrome")) {
+    return { color: "#E2E8F0", roughness: 0.08, metalness: 0.95 };
+  }
+  if (colorStr.includes("modernlife") || colorStr.includes("21226")) {
+    return { color: "#0F4C5C", roughness: 0.3, metalness: 0.1 };
+  }
+  if (colorStr.includes("wood") || colorStr.includes("walnut")) {
+    return { color: "#6E4729", roughness: 0.4, metalness: 0.05 };
+  }
+  return { color: "#FFFFFF", roughness: 0.15, metalness: 0.05 };
+}
+
+function getProductColor(modelName) {
+  return getProductMaterialProps({ model_name: modelName }).color;
 }
 
 // Helper to generate dynamic floor textures matching chosen floor theme
@@ -297,6 +319,340 @@ function BathroomDoor({ doorPlacement, roomWidth, roomDepth }) {
         <boxGeometry args={[4, 2, 3]} />
         <meshStandardMaterial color="#D97E3A" metalness={0.85} roughness={0.2} />
       </mesh>
+    </group>
+  );
+}
+
+// Faucet Fixture: Base-Mount vs Wall-Mount positioning aligned with sink & mirror center
+function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClick, onCycleProduct, hideHotspots }) {
+  const fPlacement = faucetPlacement || { sku_code: "23475T-4", category: "faucet", subcategory: "base-mount", model_name: "Parallel Modern Faucet", price_inr: 28000, width_in: 4, depth_in: 6.5, height_in: 8.5 };
+  const isWallMount = (fPlacement.subcategory || fPlacement.model_name || "").toLowerCase().includes("wall-mount") || (fPlacement.category || "").includes("wall");
+  const matProps = getProductMaterialProps(fPlacement);
+
+  const wbX = washbasinPlacement?.x ?? 64;
+  const wbY = washbasinPlacement?.y ?? 6;
+  const wbW = washbasinPlacement?.width_in ?? 22;
+  const platformOffset = washbasinPlacement?.platform_height_offset ?? 12;
+  const basinHeight = 6;
+
+  const centerX = wbX + wbW / 2;
+
+  if (isWallMount) {
+    // Wall-mount faucet: mounted centrally on wall directly above washbasin bowl
+    const posZ = 0.6;
+    const posY = platformOffset + basinHeight + 7; // Elevated 7 inches above basin rim to prevent collision
+
+    return (
+      <group position={[centerX, posY, posZ]}>
+        {/* Wall Trim Escutcheon Plate */}
+        <mesh castShadow receiveShadow position={[0, 0, 0]}>
+          <boxGeometry args={[7, 4, 0.4]} />
+          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+        </mesh>
+        {/* Wall Spout Extrusion pointing forward into sink */}
+        <mesh castShadow receiveShadow position={[0, -0.5, 3]}>
+          <boxGeometry args={[1.5, 1.2, 5.5]} />
+          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+        </mesh>
+        {/* Single Lever Handle Control */}
+        <mesh castShadow receiveShadow position={[2.2, 0.5, 1.5]}>
+          <boxGeometry args={[1.2, 3, 1]} />
+          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+        </mesh>
+
+        {!hideHotspots && (
+          <OrangeHotspotStub
+            position={[0, 6, 2]}
+            placement={fPlacement}
+            isSelected={isSelected}
+            onClick={() => onClick(fPlacement)}
+            onCycleProduct={onCycleProduct}
+            hideHotspots={hideHotspots}
+          />
+        )}
+      </group>
+    );
+  }
+
+  // Base-mount faucet: positioned centrally on deck/platform behind washbasin bowl
+  const posZ = Math.max(2, wbY - 2.5);
+  const posY = platformOffset + basinHeight + 4;
+
+  return (
+    <group position={[centerX, posY, posZ]}>
+      {/* Faucet Base Column */}
+      <mesh castShadow receiveShadow position={[0, 0, 0]}>
+        <cylinderGeometry args={[1.2, 1.4, 8, 16]} />
+        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+      </mesh>
+      {/* Arching Spout facing forward */}
+      <mesh castShadow receiveShadow position={[0, 4.5, 2]}>
+        <boxGeometry args={[1.4, 1.5, 5]} />
+        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+      </mesh>
+      {/* Single Handle Lever */}
+      <mesh castShadow receiveShadow position={[0, 5, -0.5]} rotation={[0.2, 0, 0]}>
+        <boxGeometry args={[1.2, 3, 0.8]} />
+        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+      </mesh>
+
+      {!hideHotspots && (
+        <OrangeHotspotStub
+          position={[0, 10, 0]}
+          placement={fPlacement}
+          isSelected={isSelected}
+          onClick={() => onClick(fPlacement)}
+          onCycleProduct={onCycleProduct}
+          hideHotspots={hideHotspots}
+        />
+      )}
+    </group>
+  );
+}
+
+// Bathtub Fixture: Freestanding vs Drop-In Platform
+function BathtubFixture({ bathtubPlacement, isSelected, onClick, onCycleProduct, hideHotspots }) {
+  if (!bathtubPlacement) return null;
+
+  const subcat = (bathtubPlacement.subcategory || bathtubPlacement.model_name || "").toLowerCase();
+  const isDropIn = subcat.includes("drop_in") || subcat.includes("drop-in") || subcat.includes("drop");
+  const matProps = getProductMaterialProps(bathtubPlacement);
+
+  const wIn = Number(bathtubPlacement.width_in) || 50;
+  const dIn = Number(bathtubPlacement.depth_in) || 28;
+  const hIn = Number(bathtubPlacement.height_in) || 20;
+
+  const posX = bathtubPlacement.x + wIn / 2;
+  const posZ = bathtubPlacement.y + dIn / 2;
+  const rotY = ((bathtubPlacement.rotation_deg || 0) * Math.PI) / 180;
+
+  const handleBathtubClick = (e) => {
+    e.stopPropagation();
+    onClick?.(bathtubPlacement);
+  };
+
+  if (isDropIn) {
+    // Drop-In Tub: Built inside a raised tiled platform with an exact 1-inch border on all sides!
+    const platformW = wIn + 2; // 1-inch border left & right
+    const platformD = dIn + 2; // 1-inch border front & back
+    const platformH = hIn;
+
+    return (
+      <group position={[posX, 0, posZ]} rotation={[0, rotY, 0]} onClick={handleBathtubClick}>
+        {/* Tiled Platform Enclosure (1-inch overhang border on all sides) */}
+        <mesh position={[0, platformH / 2, 0]} receiveShadow castShadow>
+          <boxGeometry args={[platformW, platformH, platformD]} />
+          <meshStandardMaterial color="#EAE6DF" roughness={0.35} metalness={0.05} />
+        </mesh>
+        {/* Tiled Top Deck Edge Surface */}
+        <mesh position={[0, platformH - 0.2, 0]} receiveShadow>
+          <boxGeometry args={[platformW + 0.5, 0.4, platformD + 0.5]} />
+          <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.1} />
+        </mesh>
+        {/* Sunken Porcelain Tub Inner Rim */}
+        <mesh position={[0, platformH - 1, 0]} castShadow receiveShadow>
+          <boxGeometry args={[wIn, 2, dIn]} />
+          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+        </mesh>
+        {/* Deep Water Basin Interior Hollow */}
+        <mesh position={[0, platformH / 2 + 1, 0]}>
+          <boxGeometry args={[wIn - 4, platformH - 3, dIn - 4]} />
+          <meshStandardMaterial color="#38BDF8" roughness={0.05} opacity={0.65} transparent />
+        </mesh>
+
+        {!hideHotspots && (
+          <OrangeHotspotStub
+            position={[0, platformH + 4, 0]}
+            placement={bathtubPlacement}
+            isSelected={isSelected}
+            onClick={() => onClick(bathtubPlacement)}
+            onCycleProduct={onCycleProduct}
+            hideHotspots={hideHotspots}
+          />
+        )}
+      </group>
+    );
+  }
+
+  // Freestanding Bathtub: Sits directly on the bathroom floor
+  return (
+    <group position={[posX, hIn / 2, posZ]} rotation={[0, rotY, 0]} onClick={handleBathtubClick}>
+      {/* Main Tub Body */}
+      <mesh castShadow receiveShadow position={[0, 0, 0]}>
+        <boxGeometry args={[wIn, hIn, dIn]} />
+        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+      </mesh>
+      {/* Bath Interior Water */}
+      <mesh position={[0, 2, 0]}>
+        <boxGeometry args={[wIn - 4, hIn - 4, dIn - 4]} />
+        <meshStandardMaterial color="#0284C7" roughness={0.05} opacity={0.6} transparent />
+      </mesh>
+
+      {!hideHotspots && (
+        <OrangeHotspotStub
+          position={[0, hIn / 2 + 4, 0]}
+          placement={bathtubPlacement}
+          isSelected={isSelected}
+          onClick={() => onClick(bathtubPlacement)}
+          onCycleProduct={onCycleProduct}
+          hideHotspots={hideHotspots}
+        />
+      )}
+    </group>
+  );
+}
+
+// Walk-In Shower Enclosure (Default Bath Section option without bathtub)
+function WalkInShowerEnclosure({ bathPlacement, roomWidth, roomDepth, isSelected, onClick, onCycleProduct, hideHotspots }) {
+  if (!bathPlacement) return null;
+
+  const wIn = Number(bathPlacement.width_in) || 50;
+  const dIn = Number(bathPlacement.depth_in) || 28;
+  const heightIn = 84; // 7 feet tall glass walls
+
+  const posX = bathPlacement.x + wIn / 2;
+  const posZ = bathPlacement.y + dIn / 2;
+
+  const isCorner = bathPlacement.x <= 8 || (bathPlacement.x + wIn >= roomWidth - 8);
+  const isFullWidth = wIn >= roomWidth - 12;
+
+  const matGlass = new THREE.MeshStandardMaterial({
+    color: "#E0F2FE",
+    roughness: 0.1,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.35,
+    side: THREE.DoubleSide,
+  });
+
+  const matFrame = new THREE.MeshStandardMaterial({
+    color: "#CBD5E1",
+    metalness: 0.9,
+    roughness: 0.1,
+  });
+
+  const handleShowerClick = (e) => {
+    e.stopPropagation();
+    onClick?.(bathPlacement);
+  };
+
+  return (
+    <group position={[posX, 0, posZ]} onClick={handleShowerClick}>
+      {/* Non-Slip Shower Base Tray */}
+      <mesh position={[0, 1.5, 0]} receiveShadow>
+        <boxGeometry args={[wIn, 3, dIn]} />
+        <meshStandardMaterial color="#F1F5F9" roughness={0.6} />
+      </mesh>
+      {/* Stainless Drain Grid */}
+      <mesh position={[0, 3.1, 0]}>
+        <boxGeometry args={[6, 0.2, 6]} />
+        <meshStandardMaterial color="#64748B" metalness={0.9} roughness={0.2} />
+      </mesh>
+
+      {/* Front Glass Enclosure Panel with Hinged Glass Shower Door */}
+      <group position={[0, heightIn / 2 + 3, dIn / 2]}>
+        {/* Left Fixed Glass Pane */}
+        <mesh position={[-wIn / 4, 0, 0]} material={matGlass}>
+          <planeGeometry args={[wIn / 2 - 2, heightIn]} />
+        </mesh>
+        {/* Top Chrome Header Rail */}
+        <mesh position={[0, heightIn / 2 - 1, 0]}>
+          <boxGeometry args={[wIn, 2, 1]} material={matFrame} />
+        </mesh>
+        {/* Hinged Glass Shower Door Panel */}
+        <mesh position={[wIn / 4, 0, 0]} material={matGlass}>
+          <planeGeometry args={[wIn / 2 - 2, heightIn]} />
+        </mesh>
+        {/* Door Lever Handle */}
+        <mesh position={[2, 0, 1.5]}>
+          <boxGeometry args={[1.5, 8, 2]} material={matFrame} />
+        </mesh>
+      </group>
+
+      {/* Side Glass Wall Panel (Corner Shower Setup) */}
+      {!isFullWidth && isCorner && (
+        <group position={[wIn / 2, heightIn / 2 + 3, 0]} rotation={[0, Math.PI / 2, 0]}>
+          <mesh material={matGlass}>
+            <planeGeometry args={[dIn, heightIn]} />
+          </mesh>
+          <mesh position={[0, heightIn / 2 - 1, 0]}>
+            <boxGeometry args={[dIn, 2, 1]} material={matFrame} />
+          </mesh>
+        </group>
+      )}
+
+      {/* Wall-Mounted Kohler Overhead Shower Head Panel & Thermostatic Column at comfortable Y=68 height */}
+      <group position={[0, 68, -dIn / 2 + 1]}>
+        <mesh position={[0, 0, 6]} castShadow>
+          <boxGeometry args={[10, 1.5, 10]} />
+          <meshStandardMaterial color="#E2E8F0" metalness={0.9} roughness={0.1} />
+        </mesh>
+        <mesh position={[0, -18, 1]} castShadow material={matFrame}>
+          <boxGeometry args={[3, 36, 1.5]} />
+        </mesh>
+        <mesh position={[0, -32, 2.5]} castShadow material={matFrame}>
+          <boxGeometry args={[8, 4, 2]} />
+        </mesh>
+      </group>
+
+      {!hideHotspots && (
+        <OrangeHotspotStub
+          position={[0, 76, -dIn / 2 + 6]}
+          placement={{ ...bathPlacement, category: "shower_head", model_name: "Walk-In Shower Enclosure" }}
+          isSelected={isSelected}
+          onClick={() => onClick(bathPlacement)}
+          onCycleProduct={onCycleProduct}
+          hideHotspots={hideHotspots}
+        />
+      )}
+    </group>
+  );
+}
+
+// Towel Bar / Arm Component at Ergonomic Height (46 inches above floor)
+function TowelBarFixture({ placement, isSelected, onClick, onCycleProduct, hideHotspots }) {
+  if (!placement) return null;
+  const wIn = Number(placement.width_in) || 24;
+  const dIn = Number(placement.depth_in) || 3;
+  const matProps = getProductMaterialProps(placement);
+
+  const posX = placement.x + wIn / 2;
+  const posZ = placement.y + dIn / 2;
+  const rotY = ((placement.rotation_deg || 0) * Math.PI) / 180;
+  const heightY = 46;
+
+  return (
+    <group position={[posX, heightY, posZ]} rotation={[0, rotY, 0]}>
+      {/* Wall Mount Escutcheon Plates */}
+      <mesh position={[-wIn / 2 + 1, 0, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[1.5, 1.5, 1, 16]} rotation={[Math.PI / 2, 0, 0]} />
+        <meshStandardMaterial color={matProps.color} metalness={matProps.metalness} roughness={matProps.roughness} />
+      </mesh>
+      <mesh position={[wIn / 2 - 1, 0, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[1.5, 1.5, 1, 16]} rotation={[Math.PI / 2, 0, 0]} />
+        <meshStandardMaterial color={matProps.color} metalness={matProps.metalness} roughness={matProps.roughness} />
+      </mesh>
+      {/* Metallic Towel Rail Bar */}
+      <mesh castShadow receiveShadow position={[0, 0, 1.5]}>
+        <cylinderGeometry args={[0.6, 0.6, wIn - 2, 16]} rotation={[0, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={matProps.color} metalness={matProps.metalness} roughness={matProps.roughness} />
+      </mesh>
+      {/* Hanging White Towel */}
+      <mesh position={[0, -6, 1.5]} castShadow receiveShadow>
+        <boxGeometry args={[wIn - 6, 12, 1]} />
+        <meshStandardMaterial color="#FAFAFA" roughness={0.75} />
+      </mesh>
+
+      {!hideHotspots && (
+        <OrangeHotspotStub
+          position={[0, 6, 2]}
+          placement={placement}
+          isSelected={isSelected}
+          onClick={() => onClick(placement)}
+          onCycleProduct={onCycleProduct}
+          hideHotspots={hideHotspots}
+        />
+      )}
     </group>
   );
 }
@@ -731,7 +1087,7 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
         <primitive object={model} />
         {isCatalogueItem && !hideHotspots && (
           <OrangeHotspotStub
-            position={[0, 22, 0]}
+            position={(category || '').toLowerCase().includes('wash') ? [0, 6, 2] : [0, 20, 0]}
             placement={placement}
             isSelected={isSelected}
             onClick={() => onClick(placement)}
@@ -824,7 +1180,7 @@ function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutD
       </mesh>
       {isCatalogueItem && !hideHotspots && (
         <OrangeHotspotStub
-          position={[0, 22, 0]}
+          position={isWashbasin ? [0, 6, 2] : [0, 20, 0]}
           placement={placement}
           isSelected={isSelected}
           onClick={() => onClick(placement)}
@@ -843,31 +1199,18 @@ function CameraRig({ targetCamera, defaultOrbitTarget, defaultCameraPos, onReset
 
   useEffect(() => {
     if (targetCamera && targetCamera.pos && targetCamera.target) {
-      const path = targetCamera.inspectionPath;
+      const activeControls = controls || camera.controls;
+      const currentTarget = activeControls?.target ? activeControls.target.clone() : defaultOrbitTarget.clone();
 
-      if (path && path.startPos && path.endPos) {
-        animRef.current = {
-          startPos: path.startPos.clone(),
-          startTarget: path.startTarget.clone(),
-          endPos: path.endPos.clone(),
-          endTarget: path.endTarget.clone(),
-          startTime: performance.now(),
-          duration: 1100, // 1.1s smooth transition
-          isResetting: !!targetCamera.isResetting,
-        };
-      } else {
-        const activeControls = controls || camera.controls;
-        const currentTarget = activeControls?.target ? activeControls.target.clone() : defaultOrbitTarget.clone();
-        animRef.current = {
-          startPos: camera.position.clone(),
-          startTarget: currentTarget,
-          endPos: targetCamera.pos.clone(),
-          endTarget: targetCamera.target.clone(),
-          startTime: performance.now(),
-          duration: 1100,
-          isResetting: !!targetCamera.isResetting,
-        };
-      }
+      animRef.current = {
+        startPos: camera.position.clone(),
+        startTarget: currentTarget,
+        endPos: targetCamera.pos.clone(),
+        endTarget: targetCamera.target.clone(),
+        startTime: performance.now(),
+        duration: 950, // 0.95s crisp smooth transition
+        isResetting: !!targetCamera.isResetting,
+      };
     }
   }, [targetCamera, camera, controls, defaultOrbitTarget]);
 
@@ -878,8 +1221,8 @@ function CameraRig({ targetCamera, defaultOrbitTarget, defaultCameraPos, onReset
     const elapsed = performance.now() - startTime;
     const progress = Math.min(1, Math.max(0, elapsed / duration));
 
-    const t = isResetting ? (1 - progress) : progress;
-    const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    // Smooth cubic ease-in-out transition curve
+    const easeT = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
     camera.position.lerpVectors(startPos, endPos, easeT);
 
@@ -893,7 +1236,7 @@ function CameraRig({ targetCamera, defaultOrbitTarget, defaultCameraPos, onReset
       animRef.current = null;
       if (isResetting) {
         if (activeControls && activeControls.target) {
-          activeControls.target.copy(startTarget);
+          activeControls.target.copy(endTarget);
           activeControls.update();
         }
         onResetComplete?.();
@@ -905,7 +1248,7 @@ function CameraRig({ targetCamera, defaultOrbitTarget, defaultCameraPos, onReset
 }
 
 // Sub-component inside Canvas to access Three.js camera & controls refs
-function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, floorTheme, wallTheme, isZoomLocked, selectedCategory, selectedSku, customCameraTarget, handleSelectProduct, onCycleProduct, onResetComplete, hideHotspots }) {
+function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, floorTheme, wallTheme, bathSectionMode = "shower", budgetInr = "", isZoomLocked, selectedCategory, selectedSku, customCameraTarget, handleSelectProduct, onCycleProduct, onResetComplete, hideHotspots }) {
   const { camera, controls } = useThree();
 
   const washbasinPlacement = layoutData.find(p => p.category === 'washbasin' || p.category === 'wash_basin');
@@ -913,6 +1256,13 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
   const doorPlacement = layoutData.find(p => p.category === 'door');
   const windowPlacement = layoutData.find(p => p.category === 'window');
   const mirrorPlacement = layoutData.find(p => p.category === 'mirror');
+  const faucetPlacement = layoutData.find(p => p.category === 'faucet');
+  const bathtubPlacement = layoutData.find(p => p.category === 'bathtub' || p.category === 'bath_tub');
+  const towelBarPlacement = layoutData.find(p => p.category === 'towel_bar' || p.category === 'towel_arm');
+
+  const userBudgetNum = Number(budgetInr);
+  const bathtubPrice = bathtubPlacement?.price_inr || 34000;
+  const bathtubFitsInBudget = !userBudgetNum || userBudgetNum <= 0 || userBudgetNum >= bathtubPrice;
 
   const defaultOrbitTarget = useMemo(() => {
     return new THREE.Vector3(roomWidthIn / 2, 26, roomDepthIn / 2);
@@ -923,6 +1273,13 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
   }, [roomWidthIn, roomDepthIn]);
 
   const isInspecting = customCameraTarget && !customCameraTarget.isResetting;
+
+  useEffect(() => {
+    if (controls && controls.target && !customCameraTarget) {
+      controls.target.copy(defaultOrbitTarget);
+      controls.update();
+    }
+  }, [controls, defaultOrbitTarget, customCameraTarget]);
 
   return (
     <>
@@ -961,11 +1318,51 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
         mirrorPlacement={mirrorPlacement}
       />
 
+      {/* Render specialized fixtures */}
+      <FaucetFixture
+        faucetPlacement={faucetPlacement}
+        washbasinPlacement={washbasinPlacement}
+        isSelected={selectedCategory === 'faucet'}
+        onClick={(p) => handleSelectProduct(p, camera, controls)}
+        onCycleProduct={onCycleProduct}
+        hideHotspots={hideHotspots}
+      />
+      <TowelBarFixture
+        placement={towelBarPlacement}
+        isSelected={selectedCategory === 'towel_bar' || selectedCategory === 'towel_arm'}
+        onClick={(p) => handleSelectProduct(p, camera, controls)}
+        onCycleProduct={onCycleProduct}
+        hideHotspots={hideHotspots}
+      />
+
+      {bathSectionMode === "bathtub" ? (
+        bathtubFitsInBudget ? (
+          <BathtubFixture
+            bathtubPlacement={bathtubPlacement}
+            isSelected={selectedCategory === 'bathtub'}
+            onClick={(p) => handleSelectProduct(p, camera, controls)}
+            onCycleProduct={onCycleProduct}
+            hideHotspots={hideHotspots}
+          />
+        ) : null
+      ) : bathSectionMode === "shower" ? (
+        <WalkInShowerEnclosure
+          bathPlacement={bathtubPlacement || { x: 12, y: 12, width_in: 60, depth_in: 32, category: 'bathtub' }}
+          roomWidth={roomWidthIn}
+          roomDepth={roomDepthIn}
+          isSelected={selectedCategory === 'bathtub' || selectedCategory === 'shower_head'}
+          onClick={(p) => handleSelectProduct(p, camera, controls)}
+          onCycleProduct={onCycleProduct}
+          hideHotspots={hideHotspots}
+        />
+      ) : null}
+
       {layoutData.map((placement, idx) => {
-        if (placement.category === 'faucet' || placement.category === 'door' || placement.category === 'window' || placement.category === 'mirror' || placement.category === 'toilet_seat') return null;
+        const catLower = (placement.category || "").toLowerCase();
+        if (['faucet', 'door', 'window', 'mirror', 'toilet_seat', 'bathtub', 'bath_tub', 'towel_bar', 'towel_arm'].includes(catLower)) return null;
         const hasOBJ = placement.obj_file_path && placement.has_3d_model;
 
-        const pCat = (placement.category || "").toLowerCase().replace("wash_basin", "washbasin");
+        const pCat = catLower.replace("wash_basin", "washbasin");
         const isSelected = selectedCategory
           ? pCat === selectedCategory
           : selectedSku === placement.sku_code;
@@ -1020,27 +1417,26 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
 
       <OrbitControls
         makeDefault
-        target={isInspecting ? customCameraTarget.target : defaultOrbitTarget}
         autoRotate={false}
         enableZoom={!isInspecting && !isZoomLocked}
-        enablePan={false}
-        enableRotate={!isInspecting}
+        enablePan={true}
+        enableRotate={true}
         rotateSpeed={-0.5}
         minDistance={10}
         maxDistance={450}
-        minPolarAngle={0.05}
-        maxPolarAngle={Math.PI / 2 + 0.1}
+        minPolarAngle={0.01}
+        maxPolarAngle={Math.PI / 2 + 0.35}
       />
     </>
   );
 }
 
-export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomHeight, aestheticTheme, floorTheme, wallTheme, onProductClick, onCycleProduct, hideHotspots }) {
+export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomHeight, aestheticTheme, floorTheme, wallTheme, bathSectionMode = "shower", budgetInr = "", onProductClick, onCycleProduct, hideHotspots }) {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedSku, setSelectedSku] = useState(null);
   const [isZoomLocked, setIsZoomLocked] = useState(false);
   const [customCameraTarget, setCustomCameraTarget] = useState(null);
-  const inspectionPathRef = useRef(null);
+  const originCameraRef = useRef(null);
 
   if (!layoutData || layoutData.length === 0) {
     return (
@@ -1068,9 +1464,9 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
   }, [roomWidthIn, roomDepthIn]);
 
   const handleResetCamera = () => {
-    const path = inspectionPathRef.current;
-    const targetPos = path ? path.startPos : defaultCameraPos;
-    const targetOrbit = path ? path.startTarget : defaultOrbitTarget;
+    const origin = originCameraRef.current;
+    const targetPos = origin ? origin.pos : defaultCameraPos;
+    const targetOrbit = origin ? origin.target : defaultOrbitTarget;
 
     setSelectedCategory(null);
     setSelectedSku(null);
@@ -1078,28 +1474,52 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
       pos: targetPos,
       target: targetOrbit,
       isResetting: true,
-      inspectionPath: path,
     });
     onProductClick?.(null);
   };
 
   const handleSelectProduct = (product, camera, controls) => {
-    const isCatalogueItem = ['toilet', 'toilet_seat', 'washbasin', 'wash_basin', 'bathtub'].includes((product.category || '').toLowerCase());
-    if (!isCatalogueItem) return;
-
-    const normCat = (product.category || "").toLowerCase().replace("wash_basin", "washbasin");
+    if (!product || typeof product !== "object" || product.isObject3D || product.nativeEvent || !product.category) return;
+    const cat = (product.category || "").toLowerCase();
+    const normCat = cat.replace("wash_basin", "washbasin").replace("bath_tub", "bathtub");
 
     if (selectedCategory === normCat) {
       handleResetCamera();
       return;
     }
 
-    const cat = (product.category || "").toLowerCase();
-    const cX = product.x + (product.width_in / 2);
-    const cZ = product.y + (product.depth_in / 2);
+    // Save initial room overview camera position prior to inspection session
+    const activeControls = controls || (camera ? camera.controls : null);
+    if (!originCameraRef.current) {
+      originCameraRef.current = {
+        pos: camera ? camera.position.clone() : defaultCameraPos.clone(),
+        target: activeControls?.target ? activeControls.target.clone() : defaultOrbitTarget.clone(),
+      };
+    }
+
+    const cX = (product.x ?? (roomWidthIn / 2)) + ((Number(product.width_in) || 20) / 2);
+    let cZ = (product.y ?? (roomDepthIn / 2)) + ((Number(product.depth_in) || 20) / 2);
     const pOffset = product.platform_height_offset || 0;
 
-    let target = new THREE.Vector3(cX, pOffset + 12, cZ);
+    let targetY = pOffset + 12;
+    let eyeHeight = pOffset + 26;
+    let camOffsetDist = 44;
+
+    if (cat.includes("shower") || product.is_shower_head) {
+      const showerTarget = new THREE.Vector3(cX, 56, cZ);
+      const showerPos = new THREE.Vector3(cX, 66, Math.min(roomDepthIn * 1.05, cZ + 68));
+      setSelectedCategory(normCat);
+      setSelectedSku(product.sku_code);
+      setCustomCameraTarget({
+        pos: showerPos,
+        target: showerTarget,
+        isResetting: false,
+      });
+      onProductClick?.(product);
+      return;
+    }
+
+    let target = new THREE.Vector3(cX, targetY, cZ);
 
     const distBack = cZ;
     const distFront = roomDepthIn - cZ;
@@ -1108,9 +1528,6 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
     const minDist = Math.min(distBack, distFront, distLeft, distRight);
 
     let pos;
-    const camOffsetDist = cat === 'bathtub' ? 82 : 44;
-    const eyeHeight = pOffset + (cat === 'bathtub' ? 38 : 24);
-
     if (minDist === distFront) {
       pos = new THREE.Vector3(cX, eyeHeight, Math.max(12, cZ - camOffsetDist));
     } else if (minDist === distLeft) {
@@ -1121,25 +1538,12 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
       pos = new THREE.Vector3(cX, eyeHeight, Math.min(roomDepthIn - 12, cZ + camOffsetDist));
     }
 
-    // Preserve the original pre-inspection camera angle & distance
-    const prevPath = inspectionPathRef.current;
-    const startPos = prevPath ? prevPath.startPos : (camera ? camera.position.clone() : defaultCameraPos.clone());
-    const startTarget = prevPath ? prevPath.startTarget : ((controls && controls.target) ? controls.target.clone() : defaultOrbitTarget.clone());
-
-    inspectionPathRef.current = {
-      startPos,
-      startTarget,
-      endPos: pos,
-      endTarget: target,
-    };
-
     setSelectedCategory(normCat);
     setSelectedSku(product.sku_code);
     setCustomCameraTarget({
       pos,
       target,
       isResetting: false,
-      inspectionPath: inspectionPathRef.current,
     });
     onProductClick?.(product);
   };
@@ -1192,6 +1596,8 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
           aestheticTheme={aestheticTheme}
           floorTheme={floorTheme}
           wallTheme={wallTheme}
+          bathSectionMode={bathSectionMode}
+          budgetInr={budgetInr}
           isZoomLocked={isZoomLocked}
           selectedCategory={selectedCategory}
           selectedSku={selectedSku}
@@ -1200,7 +1606,7 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
           onCycleProduct={onCycleProduct}
           onResetComplete={() => {
             setCustomCameraTarget(null);
-            inspectionPathRef.current = null;
+            originCameraRef.current = null;
           }}
           hideHotspots={hideHotspots}
         />

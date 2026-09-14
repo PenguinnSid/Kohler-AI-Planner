@@ -14,6 +14,7 @@ class ProductOut(BaseModel):
     height_in: Optional[float] = None
     width_in: Optional[float] = None
     depth_in: Optional[float] = None
+    colour: Optional[str] = None
     has_3d_model: bool = False
     obj_file_path: Optional[str] = None
 
