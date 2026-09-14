@@ -56,33 +56,44 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
   const widthIn = roomWidthFt * 12;
   const depthIn = roomDepthFt * 12;
   const items = activeItems || {
-    toilet: { x: 4, y: 4, w: 16, h: 26, rot: 0 },
+    toilet: { x: 4, y: Math.max(30, depthIn - 34), w: 16, h: 26, rot: 0 },
     washbasin: { x: Math.max(4, widthIn - 32), y: 6, w: 22, h: 18, rot: 0 },
     cabinet: { x: Math.max(1, widthIn - 38), y: 3, w: 28, h: 24, rot: 0 },
-    bathtub: { x: 4, y: Math.max(4, depthIn - 36), w: 60, h: 32, rot: 0 },
-    window: { x: Math.max(0, widthIn / 2 - 20), y: 0, w: 40, h: 4, rot: 0 },
-    door: { x: Math.max(4, widthIn / 2 - 16), y: depthIn - 4, w: 32, h: 4, rot: 180 },
+    bathtub: { x: 4, y: 4, w: 50, h: 28, rot: 0 },
+    window: { x: Math.max(0, widthIn / 2 - 16), y: 0, w: 32, h: 4, rot: 0 },
+    door: { x: Math.max(4, widthIn - 38), y: depthIn - 4, w: 32, h: 4, rot: 180 },
     mirror: { x: Math.max(1, widthIn - 38), y: 0, w: 28, h: 3, rot: 0 },
   };
 
   return [
     {
-      sku_code: "K-29172IN-0",
+      sku_code: "30438IN",
       category: "toilet",
-      model_name: "Reach One-Piece Toilet",
-      price_inr: 45000,
+      model_name: "Reach Wall-Hung Round Toilet",
+      price_inr: 20000,
       x: items.toilet?.x ?? 4,
-      y: items.toilet?.y ?? 4,
-      width_in: items.toilet?.w ?? 16,
-      depth_in: items.toilet?.h ?? 26,
-      height_in: 18,
+      y: items.toilet?.y ?? 38,
+      width_in: 14.5,
+      depth_in: 21,
+      height_in: 18.5,
       rotation_deg: items.toilet?.rot ?? 0,
       obj_file_path: "models/reach_toilet.obj",
       has_3d_model: true,
-      seat_included: true,
     },
     {
-      sku_code: "K-21226IN-0_platform",
+      sku_code: "29173IN",
+      category: "toilet_seat",
+      model_name: "Span Minimalist Seat",
+      price_inr: 4800,
+      x: items.toilet?.x ?? 4,
+      y: items.toilet?.y ?? 38,
+      width_in: 14.5,
+      depth_in: 21.5,
+      height_in: 2,
+      rotation_deg: items.toilet?.rot ?? 0,
+    },
+    {
+      sku_code: "21226IN_platform",
       category: "sink_platform",
       model_name: "Counter Platform",
       x: items.cabinet?.x ?? Math.max(1, widthIn - 38),
@@ -94,27 +105,40 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       is_platform: true,
     },
     {
-      sku_code: "K-21226IN-0",
-      category: "washbasin",
-      model_name: "ModernLife Vessel Washbasin",
-      price_inr: 28000,
+      sku_code: "21226IN",
+      category: "wash_basin",
+      model_name: "ModernLife Edge 60cm Vessel Sink",
+      price_inr: 38000,
       x: items.washbasin?.x ?? Math.max(4, widthIn - 32),
       y: items.washbasin?.y ?? 6,
-      width_in: items.washbasin?.w ?? 22,
-      depth_in: items.washbasin?.h ?? 18,
+      width_in: 23.5,
+      depth_in: 15.5,
+      height_in: 5.5,
       rotation_deg: items.washbasin?.rot ?? 0,
       platform_height_offset: 12,
       obj_file_path: "models/modernlife_sink.obj",
       has_3d_model: true,
     },
     {
+      sku_code: "23475T-4",
+      category: "faucet",
+      model_name: "Parallel Modern Faucet",
+      price_inr: 28000,
+      x: items.washbasin?.x ?? Math.max(4, widthIn - 32),
+      y: items.washbasin?.y ?? 6,
+      width_in: 4,
+      depth_in: 6.5,
+      height_in: 8.5,
+      rotation_deg: items.washbasin?.rot ?? 0,
+    },
+    {
       sku_code: "bathtub_area",
       category: "bathtub",
       model_name: "Reserved Bathtub Zone",
       x: items.bathtub?.x ?? 4,
-      y: items.bathtub?.y ?? Math.max(4, depthIn - 36),
-      width_in: items.bathtub?.w ?? 60,
-      depth_in: items.bathtub?.h ?? 32,
+      y: items.bathtub?.y ?? 4,
+      width_in: items.bathtub?.w ?? 50,
+      depth_in: items.bathtub?.h ?? 28,
       rotation_deg: items.bathtub?.rot ?? 0,
       is_placeholder: true,
     },
@@ -122,9 +146,9 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       sku_code: "custom_window",
       category: "window",
       model_name: "Bathroom Window",
-      x: items.window?.x ?? Math.max(0, widthIn / 2 - 20),
+      x: items.window?.x ?? Math.max(0, widthIn / 2 - 16),
       y: 0,
-      width_in: items.window?.w ?? 40,
+      width_in: items.window?.w ?? 32,
       depth_in: 2,
       rotation_deg: items.window?.rot ?? 0,
     },
@@ -132,7 +156,7 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       sku_code: "custom_door",
       category: "door",
       model_name: "Bathroom Door",
-      x: items.door?.x ?? Math.max(4, widthIn / 2 - 16),
+      x: items.door?.x ?? Math.max(4, widthIn - 38),
       y: items.door?.y ?? depthIn - 4,
       width_in: items.door?.w ?? 32,
       depth_in: items.door?.h ?? 4,
@@ -737,60 +761,14 @@ export default function App() {
             )}
           </div>
 
-          {/* Bundle & Specs Summary Drawer Below 3D View */}
-          {result && result.bundle && (
-            <div style={{ marginTop: "40px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px" }}>
-              <div style={{
-                backgroundColor: DARK_CARD,
-                border: `1px solid ${BORDER_COLOR}`,
-                borderRadius: "12px",
-                padding: "24px",
-                boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
-              }}>
-                <h3 style={{ fontSize: "1.2rem", fontWeight: "800", color: GOLD, margin: "0 0 16px 0" }}>
-                  Selected Fixtures and Recommended Bundle
-                </h3>
-                <BundleResult bundle={result.bundle} />
-              </div>
-
-              {/* Selected Product Specifications Card */}
-              {selectedProductDetails && (
-                <div style={{
-                  backgroundColor: DARK_CARD,
-                  border: `1.5px solid ${GOLD}`,
-                  borderRadius: "12px",
-                  padding: "24px",
-                  boxShadow: `0 8px 30px rgba(218, 157, 73, 0.25)`,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                    <div style={{ fontSize: "0.8rem", fontWeight: "800", color: GOLD, textTransform: "uppercase", letterSpacing: "1px" }}>
-                      Active Fixture Inspection
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedProductDetails(null)}
-                      style={{ background: "none", border: "none", color: TEXT_MUTED, cursor: "pointer", fontSize: "1.1rem" }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <h3 style={{ fontSize: "1.3rem", fontWeight: "800", color: "#F8FAFC", margin: "0 0 10px 0" }}>
-                    {selectedProductDetails.model_name}
-                  </h3>
-                  <div style={{ fontSize: "0.9rem", color: "#CBD5E1", lineHeight: "1.6" }}>
-                    <div><strong>Category:</strong> {selectedProductDetails.category}</div>
-                    <div><strong>Price:</strong> <span style={{ color: GOLD, fontWeight: "700" }}>₹ {selectedProductDetails.price_inr?.toLocaleString('en-IN')}</span></div>
-                    {selectedProductDetails.width_in && (
-                      <div><strong>Dimensions:</strong> {selectedProductDetails.width_in}" W × {selectedProductDetails.depth_in}" D</div>
-                    )}
-                    {selectedProductDetails.description && (
-                      <div style={{ marginTop: "12px", padding: "12px", backgroundColor: DARK_BG, borderRadius: "6px", border: `1px solid ${BORDER_COLOR}`, fontStyle: "italic", fontSize: "0.85rem", color: TEXT_MUTED }}>
-                        "{selectedProductDetails.description}"
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+          {/* Selected Products Summary List and Total Cost at the Bottom */}
+          {result && (
+            <div style={{ marginTop: "40px", width: "100%" }}>
+              <BundleResult
+                bundle={result.bundle}
+                layout={result.layout}
+                selectedProductsMap={selectedProductsMap}
+              />
             </div>
           )}
         </section>
