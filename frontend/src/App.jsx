@@ -73,7 +73,7 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
     bathtub: { x: 4, y: 4, w: 50, h: 28, rot: 0 },
     window: { x: Math.max(0, widthIn / 2 - 16), y: 0, w: 32, h: 4, rot: 0 },
     door: { x: Math.max(4, widthIn - 38), y: depthIn - 4, w: 32, h: 4, rot: 180 },
-    mirror: { x: Math.max(1, widthIn - 35), y: 0, w: 28, h: 3, rot: 0 },
+    mirror: { x: Math.max(65, widthIn - 31), y: 0, w: 26, h: 3, rot: 0 },
   };
 
   return [
@@ -165,14 +165,46 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       sku_code: "custom_mirror",
       category: "mirror",
       model_name: "Vanity Mirror",
-      x: items.mirror?.x ?? Math.max(1, widthIn - 35),
+      x: items.mirror?.x ?? Math.max(65, widthIn - 31),
       y: items.mirror?.y ?? 0,
-      width_in: items.mirror?.w ?? 28,
+      width_in: items.mirror?.w ?? 26,
       depth_in: items.mirror?.h ?? 3,
       rotation_deg: items.mirror?.rot ?? 0,
       wallSnapSide: items.mirror?.wallSnapSide ?? "top",
     },
   ];
+
+  if (items?.towel_bar) {
+    placements.push({
+      sku_code: "custom_towel_bar",
+      category: "towel_bar",
+      model_name: "Wall Towel Bar",
+      x: items.towel_bar.x,
+      y: items.towel_bar.y,
+      width_in: items.towel_bar.w,
+      depth_in: items.towel_bar.h,
+      rotation_deg: items.towel_bar.rot ?? 90,
+      wallSnapSide: items.towel_bar.wallSnapSide ?? "left",
+    });
+  }
+
+  if (items?.dustbin) {
+    placements.push({
+      sku_code: "custom_dustbin",
+      category: "dustbin",
+      model_name: "Pedal Dustbin",
+      x: items.dustbin.x,
+      y: items.dustbin.y,
+      width_in: items.dustbin.w,
+      depth_in: items.dustbin.h,
+      rotation_deg: items.dustbin.rot ?? 0,
+    });
+  }
+
+  return placements.filter((p) => {
+    if (p.sku_code.includes("platform") || p.sku_code.includes("wash_basin") || p.sku_code.includes("faucet")) return true;
+    return !!items[p.category];
+  });
 }
 
 export default function App() {
@@ -317,8 +349,8 @@ export default function App() {
         {/* Brand / Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div style={{
-            width: "36px",
-            height: "36px",
+            width: "38px",
+            height: "38px",
             borderRadius: "8px",
             backgroundColor: "#000000",
             color: "#FFFFFF",
@@ -326,18 +358,15 @@ export default function App() {
             alignItems: "center",
             justifyContent: "center",
             fontWeight: "900",
-            fontSize: "1.2rem",
+            fontSize: "1.3rem",
             boxShadow: `0 2px 8px rgba(0,0,0,0.25)`,
           }}>
             K
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "800", letterSpacing: "0.5px", color: "#000000" }}>
+            <h1 style={{ margin: 0, fontSize: "1.45rem", fontWeight: "900", letterSpacing: "0.5px", color: "#000000" }}>
               Kohler AI planner
             </h1>
-            <div style={{ fontSize: "0.72rem", color: "#64748B" }}>
-              Interactive 3D Architectural Scene & Transparent Live Overlays
-            </div>
           </div>
         </div>
 

@@ -127,6 +127,63 @@ export function hasIllegalOverlap(proposedState, roomWidthIn, roomDepthIn) {
   return false;
 }
 
+export function adjustMirrorForWindowOverlap(items, roomWidthIn, roomDepthIn) {
+  if (!items || !items.mirror || !items.window) return items;
+  const mirror = items.mirror;
+  const win = items.window;
+
+  const mirSide = mirror.wallSnapSide || (mirror.y <= 10 ? "top" : mirror.y >= roomDepthIn - 10 ? "bottom" : mirror.x <= 10 ? "left" : "right");
+  const winSide = win.wallSnapSide || (win.y <= 10 ? "top" : win.y >= roomDepthIn - 10 ? "bottom" : win.x <= 10 ? "left" : "right");
+
+  if (mirSide === winSide || mirSide === "top") {
+    const winLeft = win.x;
+    const winRight = win.x + win.w;
+    const mirLeft = mirror.x;
+    const mirRight = mirror.x + mirror.w;
+
+    // Check horizontal overlap
+    if (mirLeft < winRight && mirRight > winLeft) {
+      let newMir = { ...mirror };
+      const winMid = winLeft + win.w / 2;
+      const mirMid = mirLeft + mirror.w / 2;
+
+      if (mirMid >= winMid) {
+        // Mirror is to the right of window center -> start mirror after window
+        const targetX = winRight + 1;
+        const availableW = roomWidthIn - targetX;
+
+        if (availableW >= (mirror.minW || 14)) {
+          newMir.x = targetX;
+          if (newMir.x + newMir.w > roomWidthIn) {
+            newMir.w = Math.max(mirror.minW || 14, roomWidthIn - newMir.x);
+          }
+        } else {
+          // If tight space on right, try putting mirror to left of window
+          if (winLeft - 1 >= (mirror.minW || 14)) {
+            newMir.w = Math.min(mirror.w, winLeft - 1);
+            newMir.x = winLeft - 1 - newMir.w;
+          } else {
+            newMir.w = Math.max(12, availableW);
+            newMir.x = Math.max(0, roomWidthIn - newMir.w);
+          }
+        }
+      } else {
+        // Mirror is to the left of window center -> keep mirror before window
+        const maxRight = winLeft - 1;
+        if (mirRight > maxRight) {
+          newMir.w = Math.max(mirror.minW || 14, maxRight - newMir.x);
+          if (newMir.x + newMir.w > maxRight) {
+            newMir.x = Math.max(0, maxRight - newMir.w);
+          }
+        }
+      }
+      return { ...items, mirror: newMir };
+    }
+  }
+
+  return items;
+}
+
 export default function LayoutPlanner2D({
   roomWidthFt = 8,
   setRoomWidthFt,
@@ -237,14 +294,15 @@ export default function LayoutPlanner2D({
     bathtub: { x: 4, y: 4, w: 50, h: 28, heightIn: 22, rot: 0, label: "Bathtub / Shower", color: "#8B5CF6", minW: 30, maxW: 78, minH: 28, maxH: 72, category: "bathtub", wallSnapSide: "top" },
     window: { x: Math.max(0, roomWidthIn / 2 - 16), y: 0, w: 32, h: 4, heightIn: 30, elevationIn: 54, rot: 0, label: "Window", color: "#0EA5E9", minW: 20, maxW: 72, minH: 3, maxH: 6, category: "window", isWallItem: true, wallSnapSide: "top" },
     door: { x: Math.max(4, roomWidthIn - 38), y: roomDepthIn - 4, w: 32, h: 4, heightIn: 84, rot: 180, label: "Door", color: "#F59E0B", minW: 24, maxW: 42, minH: 3, maxH: 6, category: "door", isWallItem: true, wallSnapSide: "bottom" },
-    mirror: { x: Math.max(1, roomWidthIn - 35), y: 0, w: 28, h: 3, heightIn: 30, elevationIn: 40, rot: 0, label: "Vanity Mirror", color: "#EC4899", minW: 14, maxW: 48, minH: 2, maxH: 4, category: "mirror", isWallItem: true, wallSnapSide: "top" },
+    mirror: { x: Math.max(65, roomWidthIn - 31), y: 0, w: 26, h: 3, heightIn: 30, elevationIn: 40, rot: 0, label: "Vanity Mirror", color: "#EC4899", minW: 14, maxW: 48, minH: 2, maxH: 4, category: "mirror", isWallItem: true, wallSnapSide: "top" },
     towel_bar: { x: 0, y: Math.max(4, roomDepthIn / 2 - 12), w: 3, h: 24, heightIn: 4, elevationIn: 44, rot: 90, label: "Towel Bar", color: "#14B8A6", minW: 3, maxW: 4, minH: 12, maxH: 36, category: "towel_bar", isWallItem: true, wallSnapSide: "left" },
   };
 
   const items = itemsState || defaultItems;
 
   const updateItemsState = (nextState) => {
-    onItemsStateChange?.(nextState);
+    const adjusted = adjustMirrorForWindowOverlap(nextState, roomWidthIn, roomDepthIn);
+    onItemsStateChange?.(adjusted);
   };
 
   // Drag start handler
@@ -479,6 +537,29 @@ export default function LayoutPlanner2D({
     delete copy[key];
     updateItemsState(copy);
     setSelectedKey("washbasin");
+  };
+
+  const handleAddOrSelectElement = (key) => {
+    if (items[key]) {
+      setSelectedKey(key);
+      return;
+    }
+
+    const elementTemplates = {
+      mirror: { x: Math.max(65, roomWidthIn - 31), y: 0, w: 26, h: 3, heightIn: 30, elevationIn: 40, rot: 0, label: "Vanity Mirror", color: "#EC4899", minW: 14, maxW: 48, minH: 2, maxH: 4, category: "mirror", isWallItem: true, wallSnapSide: "top" },
+      window: { x: Math.max(0, roomWidthIn / 2 - 16), y: 0, w: 32, h: 4, heightIn: 30, elevationIn: 54, rot: 0, label: "Window", color: "#0EA5E9", minW: 20, maxW: 72, minH: 3, maxH: 6, category: "window", isWallItem: true, wallSnapSide: "top" },
+      towel_bar: { x: 0, y: Math.max(4, roomDepthIn / 2 - 12), w: 3, h: 24, heightIn: 4, elevationIn: 44, rot: 90, label: "Towel Bar", color: "#14B8A6", minW: 3, maxW: 4, minH: 12, maxH: 36, category: "towel_bar", isWallItem: true, wallSnapSide: "left" },
+      dustbin: { x: Math.max(4, roomWidthIn - 18), y: Math.max(4, roomDepthIn - 18), w: 12, h: 12, heightIn: 16, rot: 0, label: "Dustbin", color: "#64748B", minW: 8, maxW: 24, minH: 8, maxH: 24, category: "dustbin" },
+      cabinet: { x: Math.max(1, roomWidthIn - 35), y: 3, w: 28, h: 24, heightIn: 28, rot: 0, label: "Vanity Cabinet", color: "#2563EB", minW: 18, maxW: 60, minH: 16, maxH: 36, category: "cabinet", wallSnapSide: "top" },
+      bathtub: { x: 4, y: 4, w: 50, h: 28, heightIn: 22, rot: 0, label: "Bathtub / Shower", color: "#8B5CF6", minW: 30, maxW: 78, minH: 28, maxH: 72, category: "bathtub", wallSnapSide: "top" },
+    };
+
+    const template = elementTemplates[key];
+    if (!template) return;
+
+    const updated = { ...items, [key]: template };
+    updateItemsState(updated);
+    setSelectedKey(key);
   };
 
   const selectedItem = items[selectedKey];
@@ -869,10 +950,147 @@ export default function LayoutPlanner2D({
             )}
           </div>
 
+          {/* SURFACE THEMES CARD (FLOOR & WALL SURFACE THEMES BELOW SELECTED TOOL AT THE BOTTOM) */}
+          <div style={{
+            padding: "16px 22px",
+            backgroundColor: "rgba(10, 14, 24, 0.35)",
+            borderRadius: "12px",
+            border: `1px solid rgba(255, 255, 255, 0.2)`,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+          }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              {/* Floor Surface Theme Dropdown */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", color: GOLD, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Floor Surface Theme
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#161B26", border: `1.5px solid ${BORDER_COLOR}`, borderRadius: "6px", padding: "4px 10px" }}>
+                  <span style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: selectedFloorObj.color, border: `1px solid ${selectedFloorObj.border}`, flexShrink: 0 }} />
+                  <select
+                    value={floorTheme}
+                    onChange={(e) => onFloorThemeChange?.(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: "6px 0",
+                      backgroundColor: "transparent",
+                      border: "none",
+                      color: "#FFFFFF",
+                      fontSize: "0.85rem",
+                      fontWeight: "600",
+                      outline: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {FLOOR_THEMES.map((theme) => (
+                      <option key={theme.id} value={theme.id} style={{ backgroundColor: "#161B26", color: "#FFFFFF" }}>
+                        {theme.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Wall Tile Theme Dropdown */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", color: GOLD, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Wall Tile / Surface Theme
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#161B26", border: `1.5px solid ${BORDER_COLOR}`, borderRadius: "6px", padding: "4px 10px" }}>
+                  <span style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: selectedWallObj.color, border: `1px solid ${selectedWallObj.border}`, flexShrink: 0 }} />
+                  <select
+                    value={wallTheme}
+                    onChange={(e) => onWallThemeChange?.(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: "6px 0",
+                      backgroundColor: "transparent",
+                      border: "none",
+                      color: "#FFFFFF",
+                      fontSize: "0.85rem",
+                      fontWeight: "600",
+                      outline: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {WALL_THEMES.map((theme) => (
+                      <option key={theme.id} value={theme.id} style={{ backgroundColor: "#161B26", color: "#FFFFFF" }}>
+                        {theme.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {/* Right Column: Controls Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          {/* Add Basic Elements Menu */}
+          <div style={{
+            padding: "16px",
+            backgroundColor: "rgba(10, 14, 24, 0.35)",
+            borderRadius: "10px",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+          }}>
+            <div style={{ fontSize: "0.78rem", fontWeight: "800", color: "#FFFFFF", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.6px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>Add Basic Elements</span>
+              <span style={{ fontSize: "0.7rem", color: "#94A3B8", textTransform: "none", fontWeight: "400" }}>Click to insert</span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              {[
+                { key: "mirror", label: "Mirror", color: "#EC4899" },
+                { key: "window", label: "Window", color: "#0EA5E9" },
+                { key: "towel_bar", label: "Towel Bar", color: "#14B8A6" },
+                { key: "dustbin", label: "Dustbin", color: "#64748B" },
+                { key: "cabinet", label: "Cabinet", color: "#2563EB" },
+                { key: "bathtub", label: "Bathtub", color: "#8B5CF6" },
+              ].map((elem) => {
+                const isPresent = !!items[elem.key];
+                return (
+                  <button
+                    key={elem.key}
+                    type="button"
+                    onClick={() => handleAddOrSelectElement(elem.key)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "8px 10px",
+                      backgroundColor: isPresent ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.4)",
+                      border: isPresent ? `1.5px solid ${elem.color}` : "1px solid rgba(255, 255, 255, 0.15)",
+                      borderRadius: "6px",
+                      color: "#FFFFFF",
+                      fontSize: "0.78rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      transition: "all 0.18s ease",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
+                      e.currentTarget.style.borderColor = elem.color;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = isPresent ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.4)";
+                      e.currentTarget.style.borderColor = isPresent ? elem.color : "rgba(255, 255, 255, 0.15)";
+                    }}
+                  >
+                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: elem.color, flexShrink: 0 }} />
+                    <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{elem.label}</span>
+                    {isPresent ? (
+                      <span style={{ fontSize: "0.65rem", color: elem.color, fontWeight: "800" }}>✓</span>
+                    ) : (
+                      <span style={{ fontSize: "0.75rem", color: "#94A3B8", fontWeight: "700" }}>+</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Room Dimensions & Specifications Card */}
           <div style={{
@@ -993,77 +1211,7 @@ export default function LayoutPlanner2D({
             </div>
           </div>
 
-          {/* Surface Themes Dropdowns Card */}
-          <div style={{
-            padding: "16px",
-            backgroundColor: "rgba(10, 14, 24, 0.35)",
-            borderRadius: "10px",
-            border: "1px solid rgba(255, 255, 255, 0.18)",
-          }}>
 
-            {/* Floor Surface Theme Dropdown */}
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", color: GOLD, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Floor Surface Theme
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#161B26", border: `1.5px solid ${BORDER_COLOR}`, borderRadius: "6px", padding: "4px 10px" }}>
-                <span style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: selectedFloorObj.color, border: `1px solid ${selectedFloorObj.border}`, flexShrink: 0 }} />
-                <select
-                  value={floorTheme}
-                  onChange={(e) => onFloorThemeChange?.(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "6px 0",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    color: "#FFFFFF",
-                    fontSize: "0.85rem",
-                    fontWeight: "600",
-                    outline: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  {FLOOR_THEMES.map((theme) => (
-                    <option key={theme.id} value={theme.id} style={{ backgroundColor: "#161B26", color: "#FFFFFF" }}>
-                      {theme.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Wall Tile Theme Dropdown */}
-            <div>
-              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", color: GOLD, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Wall Tile / Surface Theme
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#161B26", border: `1.5px solid ${BORDER_COLOR}`, borderRadius: "6px", padding: "4px 10px" }}>
-                <span style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: selectedWallObj.color, border: `1px solid ${selectedWallObj.border}`, flexShrink: 0 }} />
-                <select
-                  value={wallTheme}
-                  onChange={(e) => onWallThemeChange?.(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "6px 0",
-                    backgroundColor: "transparent",
-                    border: "none",
-                    color: "#FFFFFF",
-                    fontSize: "0.85rem",
-                    fontWeight: "600",
-                    outline: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  {WALL_THEMES.map((theme) => (
-                    <option key={theme.id} value={theme.id} style={{ backgroundColor: "#161B26", color: "#FFFFFF" }}>
-                      {theme.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-          </div>
 
           {/* Feature Toggles */}
           <div style={{

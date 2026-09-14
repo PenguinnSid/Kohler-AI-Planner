@@ -129,17 +129,17 @@ function Floor({ width, depth, floorTheme }) {
 }
 
 // Dynamic 3D Vanity Mirror component (moves and auto-aligns to any wall based on 2D placement)
-function VanityMirror({ washbasinPlacement, cabinetPlacement, mirrorPlacement, roomWidth, roomDepth }) {
+function VanityMirror({ washbasinPlacement, cabinetPlacement, mirrorPlacement, windowPlacement, roomWidth, roomDepth }) {
   const targetObj = mirrorPlacement || cabinetPlacement || washbasinPlacement;
   if (!targetObj) return null;
 
   const targetX = targetObj.x || 0;
   const targetY = targetObj.y || 0;
-  const targetW = targetObj.width_in || targetObj.w || 28;
+  const targetW = targetObj.width_in || targetObj.w || 26;
   const targetH = targetObj.depth_in || targetObj.h || 3;
 
-  const mirrorWidth = Math.max(16, targetW);
-  const mirrorHeight = Math.max(22, mirrorWidth * 0.9);
+  let mirrorWidth = Math.max(14, targetW);
+  const mirrorHeight = Math.max(20, mirrorWidth * 0.9);
   const mirrorY = 36 + mirrorHeight / 2;
 
   let posX = targetX + targetW / 2;
@@ -173,6 +173,23 @@ function VanityMirror({ washbasinPlacement, cabinetPlacement, mirrorPlacement, r
     posX = targetX + targetW / 2;
     posZ = 0.4;
     rotY = 0;
+
+    // Check window intersection on back wall
+    if (windowPlacement) {
+      const winW = windowPlacement.width_in || windowPlacement.w || 32;
+      const winX = windowPlacement.x ?? Math.max(0, roomWidth / 2 - winW / 2);
+      const winRight = winX + winW;
+      const mirLeft = posX - mirrorWidth / 2;
+      const mirRight = posX + mirrorWidth / 2;
+
+      if (mirLeft < winRight && mirRight > winX) {
+        const newLeft = winRight + 1;
+        if (newLeft + mirrorWidth > roomWidth) {
+          mirrorWidth = Math.max(14, roomWidth - newLeft - 1);
+        }
+        posX = newLeft + mirrorWidth / 2;
+      }
+    }
   }
 
   return (
@@ -206,10 +223,11 @@ function VanityMirror({ washbasinPlacement, cabinetPlacement, mirrorPlacement, r
         />
       </mesh>
 
-      {/* Backlit Soft LED Frame Glow */}
+      {/* Backlit Soft LED Frame Glow & Ambient Point Light */}
+      <pointLight position={[0, 0, 2]} color="#FFE8D6" intensity={1.8} distance={70} />
       <mesh position={[0, 0, -0.05]}>
-        <boxGeometry args={[mirrorWidth + 2.5, mirrorHeight + 2.5, 0.3]} />
-        <meshBasicMaterial color="#DA9D49" transparent opacity={0.25} />
+        <boxGeometry args={[mirrorWidth + 3, mirrorHeight + 3, 0.4]} />
+        <meshStandardMaterial color="#FFB86C" emissive="#FFB86C" emissiveIntensity={0.8} transparent opacity={0.45} />
       </mesh>
     </group>
   );
@@ -414,7 +432,7 @@ function RoomWalls({ width, depth, theme, wallTheme, wallSide, washbasinPlacemen
       <FakeWindow windowPlacement={windowPlacement} roomWidth={width} roomDepth={depth} />
 
       {/* Vanity Mirror mounted above Washbasin */}
-      <VanityMirror washbasinPlacement={washbasinPlacement} cabinetPlacement={cabinetPlacement} roomWidth={width} roomDepth={depth} />
+      <VanityMirror washbasinPlacement={washbasinPlacement} cabinetPlacement={cabinetPlacement} mirrorPlacement={mirrorPlacement} windowPlacement={windowPlacement} roomWidth={width} roomDepth={depth} />
 
       {/* Architectural 3D Door */}
       <BathroomDoor doorPlacement={doorPlacement} roomWidth={width} roomDepth={depth} />
@@ -507,87 +525,90 @@ function OrangeHotspotStub({ position, placement, isSelected, onClick, onCyclePr
         </div>
 
         {/* Floating Callout Card matching screenshot format + Left & Right Cycle Arrows */}
-        {isSelected && !hideHotspots && (
-          <div
-            style={{
-              position: "absolute",
-              left: "24px",
-              bottom: "16px",
-              display: "flex",
-              alignItems: "flex-end",
-              pointerEvents: "auto",
-              minWidth: "250px",
-            }}
-          >
-            <svg width="45" height="35" style={{ overflow: "visible", flexShrink: 0 }}>
-              <polyline
-                points="0,35 25,8 45,8"
-                fill="none"
-                stroke="#D97E3A"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+        {isSelected && !hideHotspots && (() => {
+          const catNorm = (placement?.category || "").toLowerCase();
+          const isBelow = catNorm === "bathtub";
 
+          return (
             <div
               style={{
-                marginLeft: "6px",
-                color: "#FFFFFF",
-                fontFamily: "'Segoe UI', Roboto, sans-serif",
-                textShadow: "0 2px 8px rgba(0,0,0,0.98), 0 0 12px rgba(0,0,0,0.95)",
-                lineHeight: "1.5",
-                backgroundColor: "transparent",
-                border: "none",
-                padding: "2px 6px",
+                position: "absolute",
+                left: "14px",
+                ...(isBelow ? { top: "14px" } : { bottom: "12px" }),
+                display: "flex",
+                alignItems: isBelow ? "flex-start" : "flex-end",
+                pointerEvents: "auto",
+                zIndex: 30,
               }}
             >
-              {/* Category Header Title in Orange */}
+              {/* SVG Pointer Bar starting OUTSIDE the circle and merging seamlessly into category title underline */}
+              <svg width="46" height="38" style={{ overflow: "visible", flexShrink: 0, display: "block" }}>
+                <polyline
+                  points={isBelow ? "4,4 24,28 46,28" : "4,34 24,6 46,6"}
+                  fill="none"
+                  stroke="#D97E3A"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+
               <div
                 style={{
-                  borderBottom: "2px solid #D97E3A",
-                  paddingBottom: "4px",
-                  marginBottom: "6px",
+                  marginLeft: "-1px",
+                  marginTop: isBelow ? "21px" : "0",
+                  marginBottom: isBelow ? "0" : "1px",
+                  color: "#FFFFFF",
+                  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                  lineHeight: "1.45",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  padding: "0 0 0 4px",
+                  minWidth: "220px",
                 }}
               >
+                {/* Category Header Title in Orange merged directly with pointer bar */}
                 <div
                   style={{
-                    fontSize: "1.1rem",
-                    fontWeight: "800",
-                    color: "#D97E3A",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.8px",
+                    borderBottom: "2px solid #D97E3A",
+                    paddingBottom: "4px",
+                    marginBottom: "6px",
                   }}
                 >
-                  {placement.category ? (
-                    placement.category.toLowerCase().includes("washbasin") || placement.category.toLowerCase().includes("wash_basin")
-                      ? "Wash Basin"
-                      : placement.category.replace("_", " ")
-                  ) : "Fixture"}
+                  <div
+                    style={{
+                      fontSize: "0.9rem",
+                      fontWeight: "800",
+                      color: "#D97E3A",
+                      textTransform: "uppercase",
+                      letterSpacing: "1px",
+                    }}
+                  >
+                    {placement.category ? (
+                      placement.category.toLowerCase().includes("washbasin") || placement.category.toLowerCase().includes("wash_basin")
+                        ? "Wash Basin"
+                        : placement.category.replace("_", " ")
+                    ) : "Fixture"}
+                  </div>
                 </div>
-              </div>
 
-              <div style={{ fontSize: "0.95rem", fontWeight: "700", color: "#FFFFFF" }}>
-                Name: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.model_name}</span>
+                <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#FFFFFF", marginBottom: "3px" }}>
+                  Name: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.model_name}</span>
+                </div>
+                {placement.price_inr && (
+                  <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#FFFFFF", marginBottom: "3px" }}>
+                    Price: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>₹ {placement.price_inr.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+                {placement.width_in && placement.depth_in && (
+                  <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#FFFFFF" }}>
+                    Dimensions: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.width_in}" W x {placement.depth_in}" D</span>
+                  </div>
+                )}
               </div>
-              {placement.price_inr && (
-                <div style={{ fontSize: "0.95rem", fontWeight: "700", color: "#FFFFFF" }}>
-                  Price: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>₹ {placement.price_inr.toLocaleString("en-IN")}</span>
-                </div>
-              )}
-              {placement.width_in && placement.depth_in && (
-                <div style={{ fontSize: "0.95rem", fontWeight: "700", color: "#FFFFFF" }}>
-                  Dimensions: <span style={{ fontWeight: "400", color: "#FFFFFF" }}>{placement.width_in}" W x {placement.depth_in}" D</span>
-                </div>
-              )}
-              {placement.seat_included && (
-                <div style={{ fontSize: "0.85rem", color: "#FFFFFF", fontWeight: "600", marginTop: "2px" }}>
-                  Quiet-Close Seat Included
-                </div>
-              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </Html>
   );
@@ -764,6 +785,8 @@ function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutD
   const isToilet = category === 'toilet';
   const isWashbasin = category === 'washbasin' || category === 'wash_basin';
   const isBathtub = category === 'bathtub';
+  const isDustbin = category === 'dustbin';
+  const isTowelBar = category === 'towel_bar';
 
   let geom = <boxGeometry args={[width_in, 16, depth_in]} />;
   let matColor = getProductColor(model_name);
@@ -777,6 +800,12 @@ function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutD
     geom = <boxGeometry args={[width_in, 18, depth_in]} />;
   } else if (isBathtub) {
     geom = <boxGeometry args={[width_in, 20, depth_in]} />;
+  } else if (isDustbin) {
+    geom = <cylinderGeometry args={[width_in / 2, width_in / 2.2, 16, 20]} />;
+    matColor = "#475569";
+  } else if (isTowelBar) {
+    geom = <boxGeometry args={[width_in, 3, Math.max(2, depth_in)]} />;
+    matColor = "#94A3B8";
   }
 
   return (
@@ -1079,8 +1108,8 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
     const minDist = Math.min(distBack, distFront, distLeft, distRight);
 
     let pos;
-    const camOffsetDist = cat === 'bathtub' ? 52 : 44;
-    const eyeHeight = pOffset + (cat === 'bathtub' ? 32 : 24);
+    const camOffsetDist = cat === 'bathtub' ? 82 : 44;
+    const eyeHeight = pOffset + (cat === 'bathtub' ? 38 : 24);
 
     if (minDist === distFront) {
       pos = new THREE.Vector3(cX, eyeHeight, Math.max(12, cZ - camOffsetDist));
