@@ -224,13 +224,13 @@ export default function LayoutPlanner2D({
 
   // Default fixture state dictionary (in inches)
   const defaultItems = {
-    toilet: { x: 4, y: 4, w: 16, h: 26, heightIn: 18, rot: 0, label: "Toilet", color: "#3B82F6", minW: 14, maxW: 24, minH: 18, maxH: 34, category: "toilet" },
+    toilet: { x: 4, y: Math.max(30, roomDepthIn - 34), w: 16, h: 26, heightIn: 18, rot: 0, label: "Toilet", color: "#3B82F6", minW: 14, maxW: 24, minH: 18, maxH: 34, category: "toilet" },
     washbasin: { x: Math.max(4, roomWidthIn - 32), y: 6, w: 22, h: 18, heightIn: 32, rot: 0, label: "Washbasin", color: "#10B981", minW: 14, maxW: 42, minH: 12, maxH: 28, category: "washbasin", wallSnapSide: "top" },
-    cabinet: { x: Math.max(1, roomWidthIn - 38), y: 3, w: 28, h: 24, heightIn: 28, rot: 0, label: "Vanity Cabinet", color: "#2563EB", minW: 18, maxW: 60, minH: 16, maxH: 36, category: "cabinet", wallSnapSide: "top" },
-    bathtub: { x: 4, y: Math.max(4, roomDepthIn - 36), w: 60, h: 32, heightIn: 22, rot: 0, label: "Bathtub / Shower", color: "#8B5CF6", minW: 30, maxW: 78, minH: 28, maxH: 72, category: "bathtub" },
-    window: { x: Math.max(0, roomWidthIn / 2 - 20), y: 0, w: 40, h: 4, heightIn: 30, elevationIn: 54, rot: 0, label: "Window", color: "#0EA5E9", minW: 20, maxW: 72, minH: 3, maxH: 6, category: "window", isWallItem: true, wallSnapSide: "top" },
-    door: { x: Math.max(4, roomWidthIn / 2 - 16), y: roomDepthIn - 4, w: 32, h: 4, heightIn: 84, rot: 180, label: "Door", color: "#F59E0B", minW: 24, maxW: 42, minH: 3, maxH: 6, category: "door", isWallItem: true, wallSnapSide: "bottom" },
-    mirror: { x: Math.max(1, roomWidthIn - 38), y: 0, w: 28, h: 3, heightIn: 30, elevationIn: 40, rot: 0, label: "Vanity Mirror", color: "#EC4899", minW: 14, maxW: 48, minH: 2, maxH: 4, category: "mirror", isWallItem: true, wallSnapSide: "top" },
+    cabinet: { x: Math.max(1, roomWidthIn - 35), y: 3, w: 28, h: 24, heightIn: 28, rot: 0, label: "Vanity Cabinet", color: "#2563EB", minW: 18, maxW: 60, minH: 16, maxH: 36, category: "cabinet", wallSnapSide: "top" },
+    bathtub: { x: 4, y: 4, w: 50, h: 28, heightIn: 22, rot: 0, label: "Bathtub / Shower", color: "#8B5CF6", minW: 30, maxW: 78, minH: 28, maxH: 72, category: "bathtub", wallSnapSide: "top" },
+    window: { x: Math.max(0, roomWidthIn / 2 - 16), y: 0, w: 32, h: 4, heightIn: 30, elevationIn: 54, rot: 0, label: "Window", color: "#0EA5E9", minW: 20, maxW: 72, minH: 3, maxH: 6, category: "window", isWallItem: true, wallSnapSide: "top" },
+    door: { x: Math.max(4, roomWidthIn - 38), y: roomDepthIn - 4, w: 32, h: 4, heightIn: 84, rot: 180, label: "Door", color: "#F59E0B", minW: 24, maxW: 42, minH: 3, maxH: 6, category: "door", isWallItem: true, wallSnapSide: "bottom" },
+    mirror: { x: Math.max(1, roomWidthIn - 35), y: 0, w: 28, h: 3, heightIn: 30, elevationIn: 40, rot: 0, label: "Vanity Mirror", color: "#EC4899", minW: 14, maxW: 48, minH: 2, maxH: 4, category: "mirror", isWallItem: true, wallSnapSide: "top" },
     towel_bar: { x: 0, y: Math.max(4, roomDepthIn / 2 - 12), w: 3, h: 24, heightIn: 4, elevationIn: 44, rot: 90, label: "Towel Bar", color: "#14B8A6", minW: 3, maxW: 4, minH: 12, maxH: 36, category: "towel_bar", isWallItem: true, wallSnapSide: "left" },
   };
 
@@ -351,14 +351,26 @@ export default function LayoutPlanner2D({
     };
 
     if (draggingKey === "washbasin" && proposedState.cabinet) {
+      const cabW = proposedState.washbasin.w + 6;
+      const cabH = proposedState.washbasin.h + 6;
       proposedState.cabinet = {
         ...proposedState.cabinet,
         x: Math.max(0, proposedState.washbasin.x - 3),
         y: Math.max(0, proposedState.washbasin.y - 3),
-        w: proposedState.washbasin.w + 6,
-        h: proposedState.washbasin.h + 6,
+        w: cabW,
+        h: cabH,
         rot: proposedState.washbasin.rot,
         wallSnapSide: proposedState.washbasin.wallSnapSide,
+      };
+    } else if (draggingKey === "cabinet" && proposedState.washbasin) {
+      const wbW = proposedState.washbasin.w;
+      const wbH = proposedState.washbasin.h;
+      proposedState.washbasin = {
+        ...proposedState.washbasin,
+        x: Math.max(0, proposedState.cabinet.x + (proposedState.cabinet.w - wbW) / 2),
+        y: Math.max(0, proposedState.cabinet.y + (proposedState.cabinet.h - wbH) / 2),
+        rot: proposedState.cabinet.rot,
+        wallSnapSide: proposedState.cabinet.wallSnapSide,
       };
     }
 

@@ -199,7 +199,6 @@ export default function CatalogBrowser({ selectedProductsMap, onSelectProduct })
           >
             <option value="">All Categories ({products.length})</option>
             <option value="toilet">Toilets</option>
-            <option value="toilet_seat">Toilet Seats</option>
             <option value="washbasin">Wash Basins / Sinks</option>
             <option value="faucet">Faucets & Brassware</option>
           </select>

@@ -591,16 +591,28 @@ function OrangeHotspotStub({ position, placement, isSelected, onClick, onCyclePr
   );
 }
 
-function OBJProduct({ placement, isSelected, onClick, onCycleProduct }) {
+function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData }) {
   const { sku_code, category, x, y, width_in, depth_in, model_name, obj_file_path, platform_height_offset } = placement;
   const [model, setModel] = useState(null);
 
   const wIn = Number(width_in) || 16;
   const dIn = Number(depth_in) || 16;
-  const centerX = (Number(x) || 0) + wIn / 2;
-  const centerZ = (Number(y) || 0) + dIn / 2;
+  let centerX = (Number(x) || 0) + wIn / 2;
+  let centerZ = (Number(y) || 0) + dIn / 2;
+
+  // Lock counter platform center to washbasin center for exact 3D alignment
+  if ((category || '').toLowerCase() === 'sink_platform' || (category || '').toLowerCase() === 'cabinet') {
+    const washbasinItem = layoutData?.find(p => (p.category || '').toLowerCase() === 'washbasin' || (p.category || '').toLowerCase() === 'wash_basin');
+    if (washbasinItem) {
+      const wbW = Number(washbasinItem.width_in) || 22;
+      const wbD = Number(washbasinItem.depth_in) || 18;
+      centerX = (Number(washbasinItem.x) || 0) + wbW / 2;
+      centerZ = (Number(washbasinItem.y) || 0) + wbD / 2;
+    }
+  }
+
   const platformOffset = Number(platform_height_offset) || 0;
-  const isCatalogueItem = ['toilet', 'toilet_seat', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
+  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
 
   useEffect(() => {
     let isSubscribed = true;
@@ -718,14 +730,26 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct }) {
   );
 }
 
-function SimpleProduct({ placement, isSelected, onClick, onCycleProduct }) {
+function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutData }) {
   const { x, y, width_in, depth_in, model_name, is_platform, is_placeholder, platform_height_offset, rotation_deg, category } = placement;
 
-  const centerX = x + width_in / 2;
-  const centerZ = y + depth_in / 2;
+  let centerX = x + width_in / 2;
+  let centerZ = y + depth_in / 2;
+
+  // Lock counter platform center to washbasin center for exact 3D alignment
+  if (is_platform || (category || '').toLowerCase() === 'sink_platform' || (category || '').toLowerCase() === 'cabinet') {
+    const washbasinItem = layoutData?.find(p => (p.category || '').toLowerCase() === 'washbasin' || (p.category || '').toLowerCase() === 'wash_basin');
+    if (washbasinItem) {
+      const wbW = Number(washbasinItem.width_in) || 22;
+      const wbD = Number(washbasinItem.depth_in) || 18;
+      centerX = (Number(washbasinItem.x) || 0) + wbW / 2;
+      centerZ = (Number(washbasinItem.y) || 0) + wbD / 2;
+    }
+  }
+
   const platformOffset = platform_height_offset || 0;
   const height = is_platform ? (placement.height_in || 12) : (is_placeholder ? 2 : 18);
-  const isCatalogueItem = ['toilet', 'toilet_seat', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
+  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
 
   const handleClick = (e) => {
     e.stopPropagation();
@@ -924,7 +948,7 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
       />
 
       {layoutData.map((placement, idx) => {
-        if (placement.category === 'faucet' || placement.category === 'door' || placement.category === 'window' || placement.category === 'mirror') return null;
+        if (placement.category === 'faucet' || placement.category === 'door' || placement.category === 'window' || placement.category === 'mirror' || placement.category === 'toilet_seat') return null;
         const hasOBJ = placement.obj_file_path && placement.has_3d_model;
 
         const pCat = (placement.category || "").toLowerCase().replace("wash_basin", "washbasin");
@@ -957,6 +981,7 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
             isSelected={isSelected}
             onClick={(p) => handleSelectProduct(p, camera, controls)}
             onCycleProduct={onCycleProduct}
+            layoutData={layoutData}
           />
         ) : (
           <SimpleProduct
@@ -965,6 +990,7 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
             isSelected={isSelected}
             onClick={(p) => handleSelectProduct(p, camera, controls)}
             onCycleProduct={onCycleProduct}
+            layoutData={layoutData}
           />
         );
       })}

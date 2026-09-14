@@ -36,7 +36,7 @@ export const FULL_CSV_PRODUCTS = [
 
 export default function BundleResult({ bundle, layout, selectedProductsMap }) {
   // Define official categories present in catalogue.csv
-  const csvCategories = ["toilet", "toilet_seat", "wash_basin", "faucet"];
+  const csvCategories = ["toilet", "wash_basin", "faucet"];
 
   const itemsList = csvCategories.map((catKey) => {
     // 1. Check custom selection map for this category
