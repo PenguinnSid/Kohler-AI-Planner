@@ -149,16 +149,26 @@ export default function CatalogBrowser({ selectedProductsMap, onSelectProduct })
 
   return (
     <div style={{
-      backgroundColor: DARK_CARD,
-      border: `1px solid ${BORDER_COLOR}`,
-      borderRadius: "12px",
-      padding: "32px",
-      boxShadow: "0 12px 36px rgba(0,0,0,0.5)",
+      backgroundColor: "transparent",
+      padding: "0",
+      boxShadow: "none",
     }}>
       {/* Header & Filter Controls Bar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "28px", borderBottom: `1px solid ${BORDER_COLOR}`, paddingBottom: "20px" }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "16px",
+        marginBottom: "28px",
+        padding: "20px 24px",
+        paddingRight: "54px",
+        backgroundColor: "rgba(10, 14, 24, 0.35)",
+        borderRadius: "12px",
+        border: `1px solid rgba(255, 255, 255, 0.18)`,
+      }}>
         <div>
-          <h2 style={{ fontSize: "1.6rem", fontWeight: "700", color: "#F8FAFC", margin: 0 }}>
+          <h2 style={{ fontSize: "1.6rem", fontWeight: "800", color: "#F8FAFC", margin: 0 }}>
             Product Catalogue
           </h2>
         </div>
@@ -237,9 +247,9 @@ export default function CatalogBrowser({ selectedProductsMap, onSelectProduct })
                 key={product.sku_code}
                 onClick={() => setExpandedSku(isExpanded ? null : product.sku_code)}
                 style={{
-                  backgroundColor: "#0B0E14",
-                  border: `1.5px solid ${isExpanded ? GOLD : (isSelectedInPlan ? GOLD : BORDER_COLOR)}`,
-                  borderRadius: "10px",
+                  backgroundColor: "rgba(10, 14, 24, 0.35)",
+                  border: `1.5px solid ${isExpanded ? GOLD : (isSelectedInPlan ? GOLD : "rgba(255,255,255,0.18)")}`,
+                  borderRadius: "12px",
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, useRef } from "react";
+import React, { useState, useEffect, Component, useRef, useMemo } from "react";
 import LayoutPlanner2D from "./components/LayoutPlanner2D";
 import CatalogBrowser from "./components/CatalogBrowser";
 import LayoutViewer3D from "./components/LayoutViewer3D";
@@ -55,14 +55,25 @@ class ErrorBoundary extends Component {
 function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
   const widthIn = roomWidthFt * 12;
   const depthIn = roomDepthFt * 12;
+
+  const washbasinX = activeItems?.washbasin?.x ?? Math.max(4, widthIn - 32);
+  const washbasinY = activeItems?.washbasin?.y ?? 6;
+  const washbasinW = activeItems?.washbasin?.w ?? 22;
+  const washbasinH = activeItems?.washbasin?.h ?? 18;
+
+  const cabinetW = activeItems?.cabinet?.w ?? 28;
+  const cabinetH = activeItems?.cabinet?.h ?? 24;
+  const cabinetX = washbasinX - (cabinetW - washbasinW) / 2;
+  const cabinetY = washbasinY - (cabinetH - washbasinH) / 2;
+
   const items = activeItems || {
     toilet: { x: 4, y: Math.max(30, depthIn - 34), w: 16, h: 26, rot: 0 },
-    washbasin: { x: Math.max(4, widthIn - 32), y: 6, w: 22, h: 18, rot: 0 },
-    cabinet: { x: Math.max(1, widthIn - 38), y: 3, w: 28, h: 24, rot: 0 },
+    washbasin: { x: washbasinX, y: washbasinY, w: washbasinW, h: washbasinH, rot: 0 },
+    cabinet: { x: cabinetX, y: cabinetY, w: cabinetW, h: cabinetH, rot: 0 },
     bathtub: { x: 4, y: 4, w: 50, h: 28, rot: 0 },
     window: { x: Math.max(0, widthIn / 2 - 16), y: 0, w: 32, h: 4, rot: 0 },
     door: { x: Math.max(4, widthIn - 38), y: depthIn - 4, w: 32, h: 4, rot: 180 },
-    mirror: { x: Math.max(1, widthIn - 38), y: 0, w: 28, h: 3, rot: 0 },
+    mirror: { x: Math.max(1, widthIn - 35), y: 0, w: 28, h: 3, rot: 0 },
   };
 
   return [
@@ -81,25 +92,13 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       has_3d_model: true,
     },
     {
-      sku_code: "29173IN",
-      category: "toilet_seat",
-      model_name: "Span Minimalist Seat",
-      price_inr: 4800,
-      x: items.toilet?.x ?? 4,
-      y: items.toilet?.y ?? 38,
-      width_in: 14.5,
-      depth_in: 21.5,
-      height_in: 2,
-      rotation_deg: items.toilet?.rot ?? 0,
-    },
-    {
       sku_code: "21226IN_platform",
       category: "sink_platform",
       model_name: "Counter Platform",
-      x: items.cabinet?.x ?? Math.max(1, widthIn - 38),
-      y: items.cabinet?.y ?? 3,
-      width_in: items.cabinet?.w ?? 28,
-      depth_in: items.cabinet?.h ?? 24,
+      x: cabinetX,
+      y: cabinetY,
+      width_in: cabinetW,
+      depth_in: cabinetH,
       height_in: 12,
       rotation_deg: items.washbasin?.rot ?? 0,
       is_platform: true,
@@ -109,8 +108,8 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       category: "wash_basin",
       model_name: "ModernLife Edge 60cm Vessel Sink",
       price_inr: 38000,
-      x: items.washbasin?.x ?? Math.max(4, widthIn - 32),
-      y: items.washbasin?.y ?? 6,
+      x: washbasinX,
+      y: washbasinY,
       width_in: 23.5,
       depth_in: 15.5,
       height_in: 5.5,
@@ -124,8 +123,8 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       category: "faucet",
       model_name: "Parallel Modern Faucet",
       price_inr: 28000,
-      x: items.washbasin?.x ?? Math.max(4, widthIn - 32),
-      y: items.washbasin?.y ?? 6,
+      x: washbasinX,
+      y: washbasinY,
       width_in: 4,
       depth_in: 6.5,
       height_in: 8.5,
@@ -166,7 +165,7 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       sku_code: "custom_mirror",
       category: "mirror",
       model_name: "Vanity Mirror",
-      x: items.mirror?.x ?? Math.max(1, widthIn - 38),
+      x: items.mirror?.x ?? Math.max(1, widthIn - 35),
       y: items.mirror?.y ?? 0,
       width_in: items.mirror?.w ?? 28,
       depth_in: items.mirror?.h ?? 3,
@@ -177,31 +176,28 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
 }
 
 export default function App() {
-  // Room Specification & Design Parameters State
+  // Room Specification & Design Parameters State (Default budget = 0)
   const [roomWidthFt, setRoomWidthFt] = useState(8);
   const [roomDepthFt, setRoomDepthFt] = useState(6);
   const [roomHeightFt, setRoomHeightFt] = useState(9);
-  const [budgetInr, setBudgetInr] = useState(200000);
+  const [budgetInr, setBudgetInr] = useState(0);
   const [aestheticTheme, setAestheticTheme] = useState("Minimalist Modern");
   const [floorTheme, setFloorTheme] = useState("marble");
   const [wallTheme, setWallTheme] = useState("subway");
   const [cohesionScore, setCohesionScore] = useState(0.8);
+
+  // Floating Overlay States over 3D Scene Background
+  const [isPlannerOpen, setIsPlannerOpen] = useState(false);
+  const [isCatalogueOpen, setIsCatalogueOpen] = useState(false);
+  const [isSpecsOpen, setIsSpecsOpen] = useState(false);
 
   // 2D Planner & Product Catalogue State
   const [itemsState, setItemsState] = useState(null);
   const [allProducts, setAllProducts] = useState([]);
   const [selectedProductsMap, setSelectedProductsMap] = useState({});
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
-  const [isCatalogueOpen, setIsCatalogueOpen] = useState(false);
-  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
-
-  // Design Results & Loading
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
 
   // Section Refs
-  const plannerRef = useRef(null);
-  const catalogueRef = useRef(null);
   const design3DRef = useRef(null);
 
   // Fetch all products on mount for instant in-3D cycling
@@ -211,183 +207,65 @@ export default function App() {
       .catch((err) => console.error("Error fetching all products:", err));
   }, []);
 
-  // Scroll listener to hide top header bar when viewing the full 3D visualizer
-  useEffect(() => {
-    const handleScroll = () => {
-      if (design3DRef.current) {
-        const rect = design3DRef.current.getBoundingClientRect();
-        if (rect.top <= 120) {
-          setIsHeaderHidden(true);
-        } else {
-          setIsHeaderHidden(false);
-        }
-      }
-    };
+  // Compute live active layout array for 3D background in real-time
+  const activeLayoutData = useMemo(() => {
+    const baseLayout = generateFallbackLayout(roomWidthFt, roomDepthFt, itemsState);
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // Helper to trigger 3D design generation with fallback support and smooth scroll
-  const handleGenerateDesign = async (overrideItems = null, shouldScroll = false) => {
-    setLoading(true);
-    try {
-      const activeItems = overrideItems || itemsState;
-      const customLayoutPayload = activeItems
-        ? {
-          toilet: activeItems.toilet ? { x: activeItems.toilet.x, y: activeItems.toilet.y, w: activeItems.toilet.w, h: activeItems.toilet.h, rot: activeItems.toilet.rot || 0 } : undefined,
-          washbasin: activeItems.washbasin ? { x: activeItems.washbasin.x, y: activeItems.washbasin.y, w: activeItems.washbasin.w, h: activeItems.washbasin.h, rot: activeItems.washbasin.rot || 0 } : undefined,
-          cabinet: activeItems.cabinet ? { x: activeItems.cabinet.x, y: activeItems.cabinet.y, w: activeItems.cabinet.w, h: activeItems.cabinet.h, rot: activeItems.cabinet.rot || 0 } : undefined,
-          bathtub: activeItems.bathtub ? { x: activeItems.bathtub.x, y: activeItems.bathtub.y, w: activeItems.bathtub.w, h: activeItems.bathtub.h, rot: activeItems.bathtub.rot || 0 } : undefined,
-          window: activeItems.window ? { x: activeItems.window.x, y: activeItems.window.y, w: activeItems.window.w, h: activeItems.window.h, rot: activeItems.window.rot || 0 } : undefined,
-          door: activeItems.door ? { x: activeItems.door.x, y: activeItems.door.y, w: activeItems.door.w, h: activeItems.door.h, rot: activeItems.door.rot || 0 } : undefined,
-          mirror: activeItems.mirror ? { x: activeItems.mirror.x, y: activeItems.mirror.y, w: activeItems.mirror.w, h: activeItems.mirror.h, rot: activeItems.mirror.rot || 0, wallSnapSide: activeItems.mirror.wallSnapSide } : undefined,
-        }
-        : null;
-
-      const payload = {
-        room_width_ft: roomWidthFt,
-        room_depth_ft: roomDepthFt,
-        budget_inr: budgetInr,
-        aesthetic_theme: aestheticTheme,
-        cohesion_score: cohesionScore,
-        custom_layout: customLayoutPayload,
-      };
-
-      let res = null;
-      try {
-        res = await createDesign(payload);
-      } catch (apiErr) {
-        console.warn("Backend API not reachable, using client layout generator fallback:", apiErr);
-        res = {
-          layout: generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems),
-          bundle: {
-            bundle_name: `${aestheticTheme} Luxury Collection`,
-            total_price_inr: 185000,
-            cohesion_score: 0.92,
-          },
+    return baseLayout.map((placement) => {
+      const pCat = placement.category;
+      const customProd = selectedProductsMap[pCat] || selectedProductsMap[pCat === "wash_basin" ? "washbasin" : pCat];
+      if (customProd) {
+        return {
+          ...placement,
+          sku_code: customProd.sku_code,
+          model_name: customProd.model_name,
+          price_inr: customProd.price_inr,
+          has_3d_model: customProd.has_3d_model,
+          obj_file_path: customProd.obj_file_path,
+          width_in: customProd.width_in || placement.width_in,
+          depth_in: customProd.depth_in || placement.depth_in,
         };
       }
-
-      // Apply any user-selected product overrides
-      if (res && res.layout && Object.keys(selectedProductsMap).length > 0) {
-        res.layout = res.layout.map((placement) => {
-          const customProd = selectedProductsMap[placement.category];
-          if (customProd) {
-            return {
-              ...placement,
-              sku_code: customProd.sku_code,
-              model_name: customProd.model_name,
-              price_inr: customProd.price_inr,
-              has_3d_model: customProd.has_3d_model,
-              obj_file_path: customProd.obj_file_path,
-            };
-          }
-          return placement;
-        });
-      }
-
-      setResult(res);
-
-      if (shouldScroll && design3DRef.current) {
-        setTimeout(() => {
-          design3DRef.current.scrollIntoView({ behavior: "smooth" });
-        }, 150);
-      }
-    } catch (err) {
-      console.error("Error generating design:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Generate initial design on mount
-  useEffect(() => {
-    handleGenerateDesign();
-  }, []);
+      return placement;
+    });
+  }, [roomWidthFt, roomDepthFt, itemsState, selectedProductsMap]);
 
   const DEFAULT_PRODUCTS = [
     {
-      sku_code: "K-29172IN-0",
+      sku_code: "30438IN",
       category: "toilet",
-      model_name: "Reach One-Piece Toilet",
-      price_inr: 45000,
-      width_in: 16,
-      depth_in: 26,
-      height_in: 18,
-      has_3d_model: true,
-      obj_file_path: "models/reach_toilet.obj",
-      seat_included: true,
-      description: "Sleek compact one-piece design with Quiet-Close seat and dual flush technology.",
-    },
-    {
-      sku_code: "K-20704IN-0",
-      category: "toilet",
-      model_name: "Veil Wall-Hung Intelligent Toilet",
-      price_inr: 65000,
-      width_in: 15,
-      depth_in: 22,
-      height_in: 16,
-      has_3d_model: true,
-      obj_file_path: "models/veil_toilet.obj",
-      seat_included: true,
-      description: "Minimalist wall-hung bowl with sculpted curves and automatic cleansing functions.",
-    },
-    {
-      sku_code: "K-77725IN-0",
-      category: "toilet",
-      model_name: "ModernLife Edge Wall-Hung Toilet",
-      price_inr: 38000,
+      model_name: "Reach Wall-Hung Round Toilet",
+      price_inr: 20000,
       width_in: 14.5,
       depth_in: 21,
-      height_in: 15,
+      height_in: 18.5,
       has_3d_model: true,
-      obj_file_path: "models/modernlife_toilet.obj",
-      seat_included: true,
-      description: "Ultra-thin rimless profile for effortless hygiene and modern aesthetics.",
+      obj_file_path: "models/reach_toilet.obj",
     },
     {
-      sku_code: "K-21226IN-0",
-      category: "washbasin",
-      model_name: "ModernLife Vessel Washbasin",
-      price_inr: 28000,
-      width_in: 22,
-      depth_in: 18,
-      height_in: 6,
+      sku_code: "21226IN",
+      category: "wash_basin",
+      model_name: "ModernLife Edge 60cm Vessel Sink",
+      price_inr: 38000,
+      width_in: 23.5,
+      depth_in: 15.5,
+      height_in: 5.5,
       has_3d_model: true,
       obj_file_path: "models/modernlife_sink.obj",
-      description: "Sophisticated vessel basin with dark accents and smooth ceramic curvature.",
     },
     {
-      sku_code: "K-20703IN-0",
-      category: "washbasin",
-      model_name: "Veil Rectangular Vessel Basin",
-      price_inr: 48000,
-      width_in: 24,
-      depth_in: 16,
-      height_in: 5,
-      has_3d_model: true,
-      obj_file_path: "models/veil_sink.obj",
-      description: "Seamless fluid design crafted with Supramic technology for slender walls.",
-    },
-    {
-      sku_code: "K-2660IN-0",
-      category: "washbasin",
-      model_name: "Forefront Rectangular Basin",
-      price_inr: 32000,
-      width_in: 23,
-      depth_in: 17,
-      height_in: 6,
-      has_3d_model: true,
-      obj_file_path: "models/forefront_sink.obj",
-      description: "Clean geometric symmetry with a soft rectangular inner bowl.",
+      sku_code: "23475T-4",
+      category: "faucet",
+      model_name: "Parallel Modern Faucet",
+      price_inr: 28000,
+      width_in: 4,
+      depth_in: 6.5,
+      height_in: 8.5,
     },
   ];
 
   // In-3D Product Cycle Arrow Handler (< and >)
   const handleCycleProduct = (category, direction) => {
-    if (!result || !result.layout) return;
-
     const normCat = category.toLowerCase().replace("wash_basin", "washbasin");
     const productsPool = (allProducts && allProducts.length > 0) ? allProducts : DEFAULT_PRODUCTS;
 
@@ -398,86 +276,45 @@ export default function App() {
 
     if (categoryProducts.length === 0) return;
 
-    const currentPlacement = result.layout.find((p) => {
+    const currentPlacement = activeLayoutData.find((p) => {
       const pCat = p.category.toLowerCase().replace("wash_basin", "washbasin");
       return pCat === normCat;
     });
 
-    if (!currentPlacement) return;
-
-    const currentIndex = categoryProducts.findIndex((p) => p.sku_code === currentPlacement.sku_code);
+    const currentIndex = currentPlacement
+      ? categoryProducts.findIndex((p) => p.sku_code === currentPlacement.sku_code)
+      : -1;
     const nextIndex = (currentIndex + direction + categoryProducts.length) % categoryProducts.length;
     const nextProduct = categoryProducts[nextIndex];
 
-    // Swap layout data in result state
-    const updatedLayout = result.layout.map((item) => {
-      const itemCat = item.category.toLowerCase().replace("wash_basin", "washbasin");
-      if (itemCat === normCat) {
-        return {
-          ...item,
-          sku_code: nextProduct.sku_code,
-          model_name: nextProduct.model_name,
-          price_inr: nextProduct.price_inr,
-          has_3d_model: nextProduct.has_3d_model,
-          obj_file_path: nextProduct.obj_file_path,
-          width_in: nextProduct.width_in || item.width_in,
-          depth_in: nextProduct.depth_in || item.depth_in,
-          description: nextProduct.description,
-          seat_included: nextProduct.seat_included,
-        };
-      }
-      return item;
-    });
-
-    setResult({ ...result, layout: updatedLayout });
     setSelectedProductDetails(nextProduct);
     setSelectedProductsMap({ ...selectedProductsMap, [category]: nextProduct, [normCat]: nextProduct });
   };
 
   // Select catalog product
   const handleSelectCatalogProduct = (product) => {
-    const nextMap = { ...selectedProductsMap, [product.category]: product };
+    const normCat = product.category.toLowerCase().replace("wash_basin", "washbasin");
+    const nextMap = { ...selectedProductsMap, [product.category]: product, [normCat]: product };
     setSelectedProductsMap(nextMap);
     setSelectedProductDetails(product);
-
-    if (result && result.layout) {
-      const updatedLayout = result.layout.map((item) => {
-        if (item.category === product.category) {
-          return {
-            ...item,
-            sku_code: product.sku_code,
-            model_name: product.model_name,
-            price_inr: product.price_inr,
-            has_3d_model: product.has_3d_model,
-            obj_file_path: product.obj_file_path,
-            width_in: product.width_in || item.width_in,
-            depth_in: product.depth_in || item.depth_in,
-          };
-        }
-        return item;
-      });
-      setResult({ ...result, layout: updatedLayout });
-    }
   };
 
   return (
     <div style={{ backgroundColor: DARK_BG, color: "#F8FAFC", minHeight: "100vh", display: "flex", flexDirection: "column", overflowX: "hidden" }}>
-      {/* White Top Header Bar */}
+      {/* Top Header & Persistent Mode Bar */}
       <header style={{
         position: "sticky",
         top: 0,
         zIndex: 100,
         backgroundColor: "#FFFFFF",
-        borderBottom: `1px solid #E2E8F0`,
-        padding: "14px 40px",
+        borderBottom: "1px solid #E2E8F0",
+        padding: "12px 40px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-        transform: isHeaderHidden ? "translateY(-100%)" : "translateY(0)",
-        opacity: isHeaderHidden ? 0 : 1,
-        transition: "transform 0.35s ease, opacity 0.35s ease",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
       }}>
+        {/* Brand / Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div style={{
             width: "36px",
@@ -490,287 +327,254 @@ export default function App() {
             justifyContent: "center",
             fontWeight: "900",
             fontSize: "1.2rem",
-            boxShadow: `0 0 12px rgba(0,0,0,0.25)`,
+            boxShadow: `0 2px 8px rgba(0,0,0,0.25)`,
           }}>
             K
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "800", letterSpacing: "0.5px", color: "#000000" }}>
+            <h1 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "800", letterSpacing: "0.5px", color: "#000000" }}>
               Kohler AI planner
             </h1>
-            <div style={{ fontSize: "0.75rem", color: "#64748B" }}>
-              Architectural 2D Layout and Immersive 3D Visualization
+            <div style={{ fontSize: "0.72rem", color: "#64748B" }}>
+              Interactive 3D Architectural Scene & Transparent Live Overlays
             </div>
           </div>
+        </div>
+
+        {/* ALWAYS-ON PERSISTENT MODE BAR ON WHITE HEADER */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          backgroundColor: "#F1F5F9",
+          padding: "5px",
+          borderRadius: "30px",
+          border: "1px solid #CBD5E1",
+        }}>
+          {/* 2D Layout Planner Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsPlannerOpen(!isPlannerOpen);
+              setIsCatalogueOpen(false);
+            }}
+            style={{
+              padding: "9px 24px",
+              backgroundColor: isPlannerOpen ? "#000000" : "transparent",
+              color: isPlannerOpen ? "#FFFFFF" : "#0F172A",
+              border: "none",
+              borderRadius: "24px",
+              fontSize: "0.88rem",
+              fontWeight: "800",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              boxShadow: isPlannerOpen ? "0 2px 8px rgba(0,0,0,0.3)" : "none",
+            }}
+          >
+            2D Layout Planner
+          </button>
+
+          {/* Product Catalogue Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsCatalogueOpen(!isCatalogueOpen);
+              setIsPlannerOpen(false);
+            }}
+            style={{
+              padding: "9px 24px",
+              backgroundColor: isCatalogueOpen ? "#000000" : "transparent",
+              color: isCatalogueOpen ? "#FFFFFF" : "#0F172A",
+              border: "none",
+              borderRadius: "24px",
+              fontSize: "0.88rem",
+              fontWeight: "800",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              boxShadow: isCatalogueOpen ? "0 2px 8px rgba(0,0,0,0.3)" : "none",
+            }}
+          >
+            Product Catalogue
+          </button>
+        </div>
+
+        {/* Action Button */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button
+            type="button"
+            onClick={() => setItemsState(null)}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "transparent",
+              border: "1px solid #000000",
+              color: "#000000",
+              borderRadius: "6px",
+              fontSize: "0.85rem",
+              fontWeight: "700",
+              cursor: "pointer",
+            }}
+          >
+            Reset Layout
+          </button>
         </div>
       </header>
 
       {/* Main Container */}
-      <main style={{ flex: 1, padding: "30px 40px 60px 40px", maxWidth: "1500px", width: "100%", margin: "0 auto" }}>
+      <main style={{ flex: 1, padding: "0 0 40px 0", width: "100%" }}>
+        
+        {/* CORE SECTION: IMMERSIVE 3D SCENE BACKGROUND WITH TRANSPARENT FULL-SCREEN OVERLAYS */}
+        <section ref={design3DRef} id="design3d" style={{ position: "relative", width: "100%" }}>
 
-        {/* SECTION 1: 2D BATHROOM PLANNER */}
-        <section ref={plannerRef} id="planner2d" style={{ marginBottom: "50px" }}>
-          <div style={{ marginBottom: "20px" }}>
-            <h2 style={{ fontSize: "1.8rem", fontWeight: "800", color: "#F8FAFC", margin: 0 }}>
-              2D Layout Planner
-            </h2>
-          </div>
-
-
-          <div style={{
-            backgroundColor: DARK_CARD,
-            border: `1px solid ${BORDER_COLOR}`,
-            borderRadius: "12px",
-            padding: "20px",
-            marginBottom: "24px",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "16px",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
-          }}>
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
-                Room Width (X): {roomWidthFt} ft
-              </label>
-              <input
-                type="range"
-                min="4"
-                max="20"
-                step="0.5"
-                value={roomWidthFt}
-                onChange={(e) => setRoomWidthFt(parseFloat(e.target.value))}
-                style={{ width: "100%", accentColor: GOLD }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
-                Room Length (Y): {roomDepthFt} ft
-              </label>
-              <input
-                type="range"
-                min="4"
-                max="20"
-                step="0.5"
-                value={roomDepthFt}
-                onChange={(e) => setRoomDepthFt(parseFloat(e.target.value))}
-                style={{ width: "100%", accentColor: GOLD }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
-                Ceiling Height (Z): {roomHeightFt} ft
-              </label>
-              <input
-                type="range"
-                min="7"
-                max="14"
-                step="0.5"
-                value={roomHeightFt}
-                onChange={(e) => setRoomHeightFt(parseFloat(e.target.value))}
-                style={{ width: "100%", accentColor: GOLD }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
-                Budget (INR)
-              </label>
-              <input
-                type="number"
-                step="10000"
-                min="50000"
-                value={budgetInr}
-                onChange={(e) => setBudgetInr(parseInt(e.target.value) || 100000)}
-                style={{
-                  width: "100%",
-                  padding: "6px 10px",
-                  backgroundColor: DARK_BG,
-                  border: `1px solid ${BORDER_COLOR}`,
-                  borderRadius: "6px",
-                  color: "#F8FAFC",
-                  fontSize: "0.85rem",
-                  outline: "none",
-                }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
-                Aesthetic Theme
-              </label>
-              <select
-                value={aestheticTheme}
-                onChange={(e) => setAestheticTheme(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "6px 10px",
-                  backgroundColor: DARK_BG,
-                  border: `1px solid ${BORDER_COLOR}`,
-                  borderRadius: "6px",
-                  color: "#F8FAFC",
-                  fontSize: "0.85rem",
-                  outline: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <option>Minimalist Modern</option>
-                <option>Classic Luxury</option>
-                <option>Japanese Zen</option>
-              </select>
-            </div>
-          </div>
-
-          <LayoutPlanner2D
-            roomWidthFt={roomWidthFt}
-            roomDepthFt={roomDepthFt}
-            roomHeightFt={roomHeightFt}
-            floorTheme={floorTheme}
-            wallTheme={wallTheme}
-            onFloorThemeChange={setFloorTheme}
-            onWallThemeChange={setWallTheme}
-            itemsState={itemsState}
-            onItemsStateChange={setItemsState}
-            onReset={() => setItemsState(null)}
-          />
-        </section>
-
-        {/* SECTION 2: CATALOGUE DROPDOWN MENU */}
-        <section ref={catalogueRef} id="catalogue" style={{ marginBottom: "50px" }}>
-          <div style={{ textAlign: "center", marginBottom: isCatalogueOpen ? "20px" : "0" }}>
-            <button
-              type="button"
-              onClick={() => setIsCatalogueOpen(!isCatalogueOpen)}
-              style={{
-                padding: "14px 36px",
-                backgroundColor: DARK_CARD,
-                border: `1.5px solid ${GOLD}`,
-                color: GOLD,
-                borderRadius: "30px",
-                fontSize: "0.95rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-                transition: "all 0.25s ease",
-              }}
-            >
-              Browse full catalogue
-            </button>
-          </div>
-
-          {isCatalogueOpen && (
-            <div className="animate-fade-in" style={{ marginTop: "20px" }}>
-              <CatalogBrowser
-                selectedProductsMap={selectedProductsMap}
-                onSelectProduct={handleSelectCatalogProduct}
-              />
-            </div>
-          )}
-        </section>
-
-        {/* SECTION 3: IMMERSIVE FULL-WIDTH 3D VISUALIZER */}
-        <section ref={design3DRef} id="design3d" style={{ position: "relative" }}>
-
-          {/* Centered Generate Button right above 3D Visualizer */}
-          <div style={{ textAlign: "center", marginBottom: "24px" }}>
-            <button
-              type="button"
-              onClick={() => handleGenerateDesign(null, true)}
-              style={{
-                padding: "16px 48px",
-                backgroundColor: "#D97E3A",
-                color: "#FFFFFF",
-                border: "none",
-                borderRadius: "32px",
-                fontSize: "1.1rem",
-                fontWeight: "800",
-                cursor: "pointer",
-                boxShadow: `0 8px 32px rgba(217, 126, 58, 0.45)`,
-                transition: "all 0.25s ease",
-                letterSpacing: "0.3px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.04)";
-                e.currentTarget.style.backgroundColor = "#F5B054";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.backgroundColor = "#D97E3A";
-              }}
-            >
-              Generate Visualization
-            </button>
-          </div>
-
-          {/* Full Screen Width Edge-to-Edge Immersive 3D Box Container with Guaranteed Height */}
+          {/* Full-Screen Immersive 3D Scene Container */}
           <div style={{
             width: "100vw",
-            marginLeft: "calc(50% - 50vw)",
-            marginRight: "calc(50% - 50vw)",
-            height: "750px",
-            minHeight: "750px",
+            height: "780px",
+            minHeight: "780px",
             backgroundColor: "#060709",
             position: "relative",
             boxShadow: "0 20px 60px rgba(0,0,0,0.9)",
-            borderTop: `1px solid ${BORDER_COLOR}`,
             borderBottom: `1px solid ${BORDER_COLOR}`,
             display: "block",
+            overflow: "hidden",
           }}>
-            {loading && (
-              <div style={{
-                position: "absolute",
-                inset: 0,
-                backgroundColor: "rgba(8, 9, 12, 0.9)",
-                backdropFilter: "blur(8px)",
-                zIndex: 30,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                color: GOLD,
-                fontWeight: "800",
-                fontSize: "1.2rem",
-                gap: "12px",
-              }}>
-                <div>Rendering Kohler 3D Architectural Scene...</div>
-                <div style={{ fontSize: "0.85rem", color: TEXT_MUTED, fontWeight: "400" }}>
-                  Aligning fixtures, geometry, lighting, and textures
+            
+            {/* 3D Scene Background Rendering Live Active Layout */}
+            <ErrorBoundary>
+              <LayoutViewer3D
+                layoutData={activeLayoutData}
+                roomWidth={roomWidthFt}
+                roomDepth={roomDepthFt}
+                roomHeight={roomHeightFt}
+                aestheticTheme={aestheticTheme}
+                floorTheme={floorTheme}
+                wallTheme={wallTheme}
+                onProductClick={setSelectedProductDetails}
+                onCycleProduct={handleCycleProduct}
+                hideHotspots={isPlannerOpen || isCatalogueOpen}
+              />
+            </ErrorBoundary>
+
+            {/* FULL-SCREEN TRANSPARENT 2D PLANNER OVERLAY (WITH ROOM & SPECS INCLUDED) */}
+            {isPlannerOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 90,
+                  overflowY: "auto",
+                  backgroundColor: "rgba(0, 0, 0, 0.35)",
+                  padding: "32px 40px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ maxWidth: "1400px", margin: "0 auto", position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsPlannerOpen(false)}
+                    title="Close 2D Planner"
+                    style={{
+                      position: "absolute",
+                      top: "2px",
+                      right: "0px",
+                      backgroundColor: "rgba(0, 0, 0, 0.75)",
+                      border: "1.5px solid rgba(255, 255, 255, 0.4)",
+                      color: "#FFFFFF",
+                      borderRadius: "50%",
+                      width: "36px",
+                      height: "36px",
+                      fontSize: "1.1rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 100,
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    ✕
+                  </button>
+
+                  <LayoutPlanner2D
+                    roomWidthFt={roomWidthFt}
+                    setRoomWidthFt={setRoomWidthFt}
+                    roomDepthFt={roomDepthFt}
+                    setRoomDepthFt={setRoomDepthFt}
+                    roomHeightFt={roomHeightFt}
+                    setRoomHeightFt={setRoomHeightFt}
+                    budgetInr={budgetInr}
+                    setBudgetInr={setBudgetInr}
+                    aestheticTheme={aestheticTheme}
+                    setAestheticTheme={setAestheticTheme}
+                    floorTheme={floorTheme}
+                    wallTheme={wallTheme}
+                    onFloorThemeChange={setFloorTheme}
+                    onWallThemeChange={setWallTheme}
+                    itemsState={itemsState}
+                    onItemsStateChange={setItemsState}
+                    onReset={() => setItemsState(null)}
+                  />
                 </div>
               </div>
             )}
 
-            {result && result.layout ? (
-              <ErrorBoundary>
-                <LayoutViewer3D
-                  layoutData={result.layout}
-                  roomWidth={roomWidthFt}
-                  roomDepth={roomDepthFt}
-                  roomHeight={roomHeightFt}
-                  aestheticTheme={aestheticTheme}
-                  floorTheme={floorTheme}
-                  wallTheme={wallTheme}
-                  onProductClick={setSelectedProductDetails}
-                  onCycleProduct={handleCycleProduct}
-                />
-              </ErrorBoundary>
-            ) : (
-              <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_MUTED, fontSize: "1.1rem" }}>
-                Click "Generate Visualization" above to render your 3D view.
+            {/* FULL-SCREEN TRANSPARENT PRODUCT CATALOGUE OVERLAY */}
+            {isCatalogueOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 90,
+                  overflowY: "auto",
+                  backgroundColor: "rgba(0, 0, 0, 0.35)",
+                  padding: "32px 40px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ maxWidth: "1300px", margin: "0 auto", position: "relative" }}>
+                  <button
+                    type="button"
+                    onClick={() => setIsCatalogueOpen(false)}
+                    title="Close Catalogue"
+                    style={{
+                      position: "absolute",
+                      top: "18px",
+                      right: "12px",
+                      backgroundColor: "rgba(0, 0, 0, 0.75)",
+                      border: "1.5px solid rgba(255, 255, 255, 0.4)",
+                      color: "#FFFFFF",
+                      borderRadius: "50%",
+                      width: "36px",
+                      height: "36px",
+                      fontSize: "1.1rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 100,
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    ✕
+                  </button>
+
+                  <CatalogBrowser
+                    selectedProductsMap={selectedProductsMap}
+                    onSelectProduct={handleSelectCatalogProduct}
+                  />
+                </div>
               </div>
             )}
           </div>
 
-          {/* Selected Products Summary List and Total Cost at the Bottom */}
-          {result && (
-            <div style={{ marginTop: "40px", width: "100%" }}>
-              <BundleResult
-                bundle={result.bundle}
-                layout={result.layout}
-                selectedProductsMap={selectedProductsMap}
-              />
-            </div>
-          )}
+          {/* Tabular CSV Selected Products Summary List and Total Cost at the Bottom */}
+          <div style={{ marginTop: "40px", padding: "0 40px", width: "100%", boxSizing: "border-box" }}>
+            <BundleResult
+              layout={activeLayoutData}
+              selectedProductsMap={selectedProductsMap}
+            />
+          </div>
         </section>
       </main>
 
@@ -783,7 +587,7 @@ export default function App() {
         fontSize: "0.85rem",
         textAlign: "center",
       }}>
-        Kohler AI Luxury Bathroom Planner • Immersive 100vw 3D Visualization and Real-time Product Swap Engine
+        Kohler AI Luxury Bathroom Planner • Immersive Real-Time 3D Visualization and Transparent Live Overlays
       </footer>
     </div>
   );

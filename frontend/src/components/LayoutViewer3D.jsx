@@ -423,8 +423,10 @@ function RoomWalls({ width, depth, theme, wallTheme, wallSide, washbasinPlacemen
 }
 
 // Orange Hotspot Stub with Price Tag & Floating Callout + Left/Right Product Cycle Arrows
-function OrangeHotspotStub({ position, placement, isSelected, onClick, onCycleProduct }) {
+function OrangeHotspotStub({ position, placement, isSelected, onClick, onCycleProduct, hideHotspots }) {
   const [hovered, setHovered] = useState(false);
+
+  if (hideHotspots) return null;
 
   return (
     <Html position={position} center style={{ pointerEvents: "none", userSelect: "none" }}>
@@ -505,7 +507,7 @@ function OrangeHotspotStub({ position, placement, isSelected, onClick, onCyclePr
         </div>
 
         {/* Floating Callout Card matching screenshot format + Left & Right Cycle Arrows */}
-        {isSelected && (
+        {isSelected && !hideHotspots && (
           <div
             style={{
               position: "absolute",
@@ -591,7 +593,7 @@ function OrangeHotspotStub({ position, placement, isSelected, onClick, onCyclePr
   );
 }
 
-function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData }) {
+function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots }) {
   const { sku_code, category, x, y, width_in, depth_in, model_name, obj_file_path, platform_height_offset } = placement;
   const [model, setModel] = useState(null);
 
@@ -706,13 +708,14 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
         onClick={handleClick}
       >
         <primitive object={model} />
-        {isCatalogueItem && (
+        {isCatalogueItem && !hideHotspots && (
           <OrangeHotspotStub
             position={[0, 22, 0]}
             placement={placement}
             isSelected={isSelected}
             onClick={() => onClick(placement)}
             onCycleProduct={onCycleProduct}
+            hideHotspots={hideHotspots}
           />
         )}
       </group>
@@ -726,11 +729,12 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
       isSelected={isSelected}
       onClick={onClick}
       onCycleProduct={onCycleProduct}
+      hideHotspots={hideHotspots}
     />
   );
 }
 
-function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutData }) {
+function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots }) {
   const { x, y, width_in, depth_in, model_name, is_platform, is_placeholder, platform_height_offset, rotation_deg, category } = placement;
 
   let centerX = x + width_in / 2;
@@ -748,74 +752,55 @@ function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutD
   }
 
   const platformOffset = platform_height_offset || 0;
-  const height = is_platform ? (placement.height_in || 12) : (is_placeholder ? 2 : 18);
   const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
 
   const handleClick = (e) => {
     e.stopPropagation();
-    if (!is_platform && isCatalogueItem) {
+    if (isCatalogueItem) {
       onClick(placement);
     }
   };
 
-  if (is_platform) {
-    const countertopHeight = 1.5;
-    const cabinetHeight = Math.max(1, height - countertopHeight);
-    return (
-      <group
-        position={[centerX, platformOffset, centerZ]}
-        rotation={[0, ((rotation_deg || 0) * Math.PI) / 180, 0]}
-      >
-        {/* Off-White Cabinet Base */}
-        <mesh
-          position={[0, cabinetHeight / 2, 0]}
-          castShadow
-          receiveShadow
-        >
-          <boxGeometry args={[width_in, cabinetHeight, depth_in]} />
-          <meshStandardMaterial color="#F5F5F0" roughness={0.3} />
-        </mesh>
-        {/* Polished Black Granite / Marble Counter Top Slab */}
-        <mesh
-          position={[0, cabinetHeight + countertopHeight / 2, 0]}
-          castShadow
-          receiveShadow
-        >
-          <boxGeometry args={[width_in + 1.2, countertopHeight, depth_in + 1.2]} />
-          <meshStandardMaterial color="#111111" roughness={0.12} metalness={0.25} />
-        </mesh>
-      </group>
-    );
-  }
+  const isToilet = category === 'toilet';
+  const isWashbasin = category === 'washbasin' || category === 'wash_basin';
+  const isBathtub = category === 'bathtub';
 
-  const color = getProductColor(model_name);
+  let geom = <boxGeometry args={[width_in, 16, depth_in]} />;
+  let matColor = getProductColor(model_name);
+
+  if (is_platform) {
+    geom = <boxGeometry args={[width_in, 12, depth_in]} />;
+    matColor = "#1E293B";
+  } else if (isWashbasin) {
+    geom = <boxGeometry args={[width_in, 6, depth_in]} />;
+  } else if (isToilet) {
+    geom = <boxGeometry args={[width_in, 18, depth_in]} />;
+  } else if (isBathtub) {
+    geom = <boxGeometry args={[width_in, 20, depth_in]} />;
+  }
 
   return (
     <group
-      position={[centerX, platformOffset, centerZ]}
+      position={[centerX, platformOffset + (is_platform ? 6 : 9), centerZ]}
       rotation={[0, ((rotation_deg || 0) * Math.PI) / 180, 0]}
       onClick={handleClick}
     >
-      <mesh
-        position={[0, height / 2, 0]}
-        castShadow={!is_placeholder}
-        receiveShadow
-      >
-        <boxGeometry args={[width_in, height, depth_in]} />
+      <mesh castShadow receiveShadow>
+        {geom}
         <meshStandardMaterial
-          color={is_placeholder ? "#313B4A" : color}
-          transparent={is_placeholder}
-          opacity={is_placeholder ? 0.35 : 1.0}
+          color={matColor}
+          roughness={is_platform ? 0.4 : 0.15}
+          metalness={0.05}
         />
       </mesh>
-
-      {!is_placeholder && !is_platform && isCatalogueItem && (
+      {isCatalogueItem && !hideHotspots && (
         <OrangeHotspotStub
-          position={[0, height + 6, 0]}
+          position={[0, 22, 0]}
           placement={placement}
           isSelected={isSelected}
           onClick={() => onClick(placement)}
           onCycleProduct={onCycleProduct}
+          hideHotspots={hideHotspots}
         />
       )}
     </group>
@@ -891,7 +876,7 @@ function CameraRig({ targetCamera, defaultOrbitTarget, defaultCameraPos, onReset
 }
 
 // Sub-component inside Canvas to access Three.js camera & controls refs
-function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, floorTheme, wallTheme, isZoomLocked, selectedCategory, selectedSku, customCameraTarget, handleSelectProduct, onCycleProduct, onResetComplete }) {
+function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, floorTheme, wallTheme, isZoomLocked, selectedCategory, selectedSku, customCameraTarget, handleSelectProduct, onCycleProduct, onResetComplete, hideHotspots }) {
   const { camera, controls } = useThree();
 
   const washbasinPlacement = layoutData.find(p => p.category === 'washbasin' || p.category === 'wash_basin');
@@ -982,6 +967,7 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
             onClick={(p) => handleSelectProduct(p, camera, controls)}
             onCycleProduct={onCycleProduct}
             layoutData={layoutData}
+            hideHotspots={hideHotspots}
           />
         ) : (
           <SimpleProduct
@@ -991,6 +977,7 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
             onClick={(p) => handleSelectProduct(p, camera, controls)}
             onCycleProduct={onCycleProduct}
             layoutData={layoutData}
+            hideHotspots={hideHotspots}
           />
         );
       })}
@@ -1019,7 +1006,7 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
   );
 }
 
-export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomHeight, aestheticTheme, floorTheme, wallTheme, onProductClick, onCycleProduct }) {
+export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomHeight, aestheticTheme, floorTheme, wallTheme, onProductClick, onCycleProduct, hideHotspots }) {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedSku, setSelectedSku] = useState(null);
   const [isZoomLocked, setIsZoomLocked] = useState(false);
@@ -1186,11 +1173,12 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
             setCustomCameraTarget(null);
             inspectionPathRef.current = null;
           }}
+          hideHotspots={hideHotspots}
         />
       </Canvas>
 
       {/* Floating Left & Right Screen Orange Arrows to Cycle Product Designs */}
-      {selectedCategory && (
+      {selectedCategory && !hideHotspots && (
         <>
           <button
             type="button"
@@ -1283,82 +1271,83 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
       )}
 
       {/* Floating Action Button Group (Bottom Right) */}
-      <div style={{
-        position: "absolute",
-        bottom: "55px",
-        right: "24px",
-        zIndex: 10,
-        display: "flex",
-        flexDirection: "column",
-        gap: "10px",
-        alignItems: "flex-end",
-      }}>
-        {/* Lock Zoom Toggle Button */}
-        <button
-          type="button"
-          onClick={() => setIsZoomLocked(!isZoomLocked)}
-          style={{
-            backgroundColor: isZoomLocked ? "#DA9D49" : "rgba(16, 20, 29, 0.9)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-            color: isZoomLocked ? "#08090C" : "#DA9D49",
-            border: "1.5px solid #DA9D49",
-            borderRadius: "8px",
-            padding: "9px 18px",
-            fontSize: "0.85rem",
-            fontWeight: "700",
-            cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
-            transition: "all 0.25s ease",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-          onMouseEnter={(e) => {
-            if (!isZoomLocked) {
-              e.currentTarget.style.backgroundColor = "#DA9D49";
-              e.currentTarget.style.color = "#08090C";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isZoomLocked) {
-              e.currentTarget.style.backgroundColor = "rgba(16, 20, 29, 0.9)";
-              e.currentTarget.style.color = "#DA9D49";
-            }
-          }}
-        >
-          {isZoomLocked ? "Zoom Locked" : "Lock Zoom"}
-        </button>
+      {!hideHotspots && (
+        <div style={{
+          position: "absolute",
+          bottom: "55px",
+          right: "24px",
+          zIndex: 10,
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          alignItems: "flex-end",
+        }}>
+          {/* Lock Zoom Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsZoomLocked(!isZoomLocked)}
+            style={{
+              backgroundColor: isZoomLocked ? "#DA9D49" : "rgba(16, 20, 29, 0.9)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              color: isZoomLocked ? "#08090C" : "#DA9D49",
+              border: "1.5px solid #DA9D49",
+              borderRadius: "8px",
+              padding: "9px 18px",
+              fontSize: "0.85rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
+              transition: "all 0.25s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+            onMouseEnter={(e) => {
+              if (!isZoomLocked) {
+                e.currentTarget.style.backgroundColor = "#DA9D49";
+                e.currentTarget.style.color = "#08090C";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isZoomLocked) {
+                e.currentTarget.style.backgroundColor = "rgba(16, 20, 29, 0.9)";
+                e.currentTarget.style.color = "#DA9D49";
+              }
+            }}
+          >
+            {isZoomLocked ? "Zoom Locked" : "Lock Zoom"}
+          </button>
 
-        {/* Reset View Button */}
-        <button
-          type="button"
-          onClick={handleResetCamera}
-          style={{
-            backgroundColor: "rgba(15, 23, 42, 0.85)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-            color: "#FFFFFF",
-            border: "1px solid rgba(217, 126, 58, 0.7)",
-            borderRadius: "8px",
-            padding: "8px 16px",
-            fontSize: "0.85rem",
-            fontWeight: "700",
-            cursor: "pointer",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
-            transition: "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(217, 126, 58, 0.85)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(15, 23, 42, 0.85)";
-          }}
-        >
-          Reset View
-        </button>
-      </div>
+          {/* Reset View Button */}
+          <button
+            type="button"
+            onClick={handleResetCamera}
+            style={{
+              backgroundColor: "rgba(15, 23, 42, 0.85)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              color: "#FFFFFF",
+              border: "1px solid rgba(217, 126, 58, 0.7)",
+              borderRadius: "8px",
+              padding: "8px 16px",
+              fontSize: "0.85rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(217, 126, 58, 0.85)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(15, 23, 42, 0.85)";
+            }}
+          >
+            Reset View
+          </button>
+        </div>
+      )}
     </div>
   );
 }
-

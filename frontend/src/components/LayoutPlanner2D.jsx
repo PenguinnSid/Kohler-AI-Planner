@@ -129,8 +129,15 @@ export function hasIllegalOverlap(proposedState, roomWidthIn, roomDepthIn) {
 
 export default function LayoutPlanner2D({
   roomWidthFt = 8,
+  setRoomWidthFt,
   roomDepthFt = 6,
+  setRoomDepthFt,
   roomHeightFt = 9,
+  setRoomHeightFt,
+  budgetInr = 0,
+  setBudgetInr,
+  aestheticTheme = "Minimalist Modern",
+  setAestheticTheme,
   floorTheme = "marble",
   wallTheme = "subway",
   onFloorThemeChange,
@@ -480,16 +487,14 @@ export default function LayoutPlanner2D({
 
   return (
     <div style={{
-      backgroundColor: DARK_CARD,
-      border: `1px solid ${BORDER_COLOR}`,
-      borderRadius: "12px",
-      padding: "24px",
-      boxShadow: "0 12px 36px rgba(0,0,0,0.5)",
+      backgroundColor: "transparent",
+      padding: "0",
+      boxShadow: "none",
     }}>
       {/* Top Header Bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <div>
-          <h3 style={{ margin: "0 0 4px 0", color: "#F8FAFC", fontSize: "1.2rem", fontWeight: "700" }}>
+          <h3 style={{ margin: "0 0 4px 0", color: "#F8FAFC", fontSize: "1.3rem", fontWeight: "800" }}>
             2D Layout Planner
           </h3>
         </div>
@@ -499,260 +504,502 @@ export default function LayoutPlanner2D({
           onClick={() => onReset?.()}
           style={{
             padding: "6px 14px",
-            backgroundColor: "transparent",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
             border: `1px solid ${GOLD}`,
             color: GOLD,
             borderRadius: "6px",
             fontSize: "0.8rem",
             fontWeight: "600",
             cursor: "pointer",
+            marginRight: "54px",
           }}
         >
           Reset Layout
         </button>
       </div>
 
-      {/* Side-by-Side Main Grid: 2D Canvas Left, Controls & Property Inspector Right */}
+      {/* Side-by-Side Main Grid: 2D Canvas & Tool Dimensions Left, Room Specs & Controls Right */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "24px", alignItems: "start" }}>
 
-        {/* Left Column: 2D Interactive Canvas Container */}
-        <div style={{
-          position: "relative",
-          width: "100%",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: "40px 52px",
-          backgroundColor: "#060709",
-          borderRadius: "8px",
-          border: `1px solid ${BORDER_COLOR}`,
-          boxSizing: "border-box",
-          minHeight: "480px",
-        }}>
-          <div
-            ref={containerRef}
-            style={{
-              position: "relative",
-              width: `${displayWidth}px`,
-              height: `${displayHeight}px`,
-              backgroundColor: "#0F131D",
-              border: `3px solid ${GOLD}`,
-              borderRadius: "4px",
-              overflow: "visible",
-              backgroundImage: `
-                linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)
-              `,
-              backgroundSize: `${12 * scale}px ${12 * scale}px`,
-              userSelect: "none",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.5)",
-            }}
-          >
-            {/* Wall Label Indicators */}
-            <div style={{ position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px" }}>
-              BACK WALL ({roomWidthFt} ft)
-            </div>
-            <div style={{ position: "absolute", bottom: -26, left: "50%", transform: "translateX(-50%)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px" }}>
-              FRONT WALL
-            </div>
-            <div style={{ position: "absolute", left: -56, top: "50%", transform: "translateY(-50%) rotate(-90deg)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px", whiteSpace: "nowrap" }}>
-              LEFT WALL
-            </div>
-            <div style={{ position: "absolute", right: -58, top: "50%", transform: "translateY(-50%) rotate(90deg)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px", whiteSpace: "nowrap" }}>
-              RIGHT WALL
-            </div>
+        {/* Left Column: 2D Interactive Canvas & Selected Tool Dimensions Below */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-            {/* Wet Zone Overlay */}
-            {showWetDryZones && items.bathtub && (() => {
-              const wetLeftIn = Math.max(0, items.bathtub.x - 6);
-              const wetTopIn = Math.max(0, items.bathtub.y - 6);
-              const wetRightIn = Math.min(roomWidthIn, items.bathtub.x + items.bathtub.w + 12);
-              const wetBottomIn = Math.min(roomDepthIn, items.bathtub.y + items.bathtub.h + 12);
-              const wetWidthIn = Math.max(1, wetRightIn - wetLeftIn);
-              const wetHeightIn = Math.max(1, wetBottomIn - wetTopIn);
+          {/* 2D Interactive Canvas Box */}
+          <div style={{
+            position: "relative",
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "40px 52px",
+            backgroundColor: "rgba(6, 7, 9, 0.35)",
+            borderRadius: "12px",
+            border: `1px solid rgba(255, 255, 255, 0.2)`,
+            boxSizing: "border-box",
+            minHeight: "480px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+          }}>
+            <div
+              ref={containerRef}
+              style={{
+                position: "relative",
+                width: `${displayWidth}px`,
+                height: `${displayHeight}px`,
+                backgroundColor: "#0F131D",
+                border: `3px solid ${GOLD}`,
+                borderRadius: "4px",
+                overflow: "visible",
+                backgroundImage: `
+                  linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)
+                `,
+                backgroundSize: `${12 * scale}px ${12 * scale}px`,
+                userSelect: "none",
+                boxShadow: "0 8px 30px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.5)",
+              }}
+            >
+              {/* Wall Label Indicators */}
+              <div style={{ position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px" }}>
+                BACK WALL ({roomWidthFt} ft)
+              </div>
+              <div style={{ position: "absolute", bottom: -26, left: "50%", transform: "translateX(-50%)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px" }}>
+                FRONT WALL
+              </div>
+              <div style={{ position: "absolute", left: -56, top: "50%", transform: "translateY(-50%) rotate(-90deg)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px", whiteSpace: "nowrap" }}>
+                LEFT WALL
+              </div>
+              <div style={{ position: "absolute", right: -58, top: "50%", transform: "translateY(-50%) rotate(90deg)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px", whiteSpace: "nowrap" }}>
+                RIGHT WALL
+              </div>
 
-              return (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: `${wetLeftIn * scale}px`,
-                    top: `${wetTopIn * scale}px`,
-                    width: `${wetWidthIn * scale}px`,
-                    height: `${wetHeightIn * scale}px`,
-                    backgroundColor: "rgba(14, 165, 233, 0.12)",
-                    border: "1.5px dashed rgba(14, 165, 233, 0.4)",
-                    borderRadius: "6px",
-                    pointerEvents: "none",
-                    display: "flex",
-                    alignItems: "flex-end",
-                    justifyContent: "flex-end",
-                    padding: "4px",
-                    fontSize: "0.6rem",
-                    color: "#0EA5E9",
-                    fontWeight: "700",
-                  }}
-                >
-                  WET ZONE
-                </div>
-              );
-            })()}
+              {/* Wet Zone Overlay */}
+              {showWetDryZones && items.bathtub && (() => {
+                const wetLeftIn = Math.max(0, items.bathtub.x - 6);
+                const wetTopIn = Math.max(0, items.bathtub.y - 6);
+                const wetRightIn = Math.min(roomWidthIn, items.bathtub.x + items.bathtub.w + 12);
+                const wetBottomIn = Math.min(roomDepthIn, items.bathtub.y + items.bathtub.h + 12);
+                const wetWidthIn = Math.max(1, wetRightIn - wetLeftIn);
+                const wetHeightIn = Math.max(1, wetBottomIn - wetTopIn);
 
-            {/* Plumbing Lines */}
-            {showPlumbing && items.washbasin && items.toilet && (
-              <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 2 }}>
-                <line
-                  x1={(items.toilet.x + items.toilet.w / 2) * scale}
-                  y1={(items.toilet.y + items.toilet.h / 2) * scale}
-                  x2={(items.washbasin.x + items.washbasin.w / 2) * scale}
-                  y2={(items.washbasin.y + items.washbasin.h / 2) * scale}
-                  stroke="rgba(218, 157, 73, 0.3)"
-                  strokeWidth="2"
-                  strokeDasharray="4,4"
-                />
-              </svg>
-            )}
-
-            {/* Render 2D Fixture Blocks */}
-            {Object.keys(items).map((key) => {
-              const item = items[key];
-              const isSelected = selectedKey === key;
-              const isDoor = key === "door" || item.category === "door";
-              const isWindow = key === "window" || item.category === "window";
-              const isCabinet = key === "cabinet";
-
-              return (
-                <div key={key} style={{ position: "relative" }}>
-                  {showClearances && !isDoor && !isWindow && !isCabinet && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${(item.x - 8) * scale}px`,
-                        top: `${(item.y - 8) * scale}px`,
-                        width: `${(item.w + 16) * scale}px`,
-                        height: `${(item.h + 16) * scale}px`,
-                        border: "1px dashed rgba(245, 158, 11, 0.35)",
-                        borderRadius: "6px",
-                        pointerEvents: "none",
-                        zIndex: 1,
-                      }}
-                    />
-                  )}
-
-                  {isDoor && showClearances && (() => {
-                    const side = item.wallSnapSide || (
-                      item.y <= 10 ? "top" :
-                      item.y >= roomDepthIn - 15 ? "bottom" :
-                      item.x <= 10 ? "left" :
-                      item.x >= roomWidthIn - 15 ? "right" : "bottom"
-                    );
-
-                    let svgLeft = item.x * scale;
-                    let svgTop = (item.y - item.w) * scale;
-                    let svgW = item.w * scale;
-                    let svgH = item.w * scale;
-                    let pathD = `M 0 ${item.w * scale} A ${item.w * scale} ${item.w * scale} 0 0 1 ${item.w * scale} 0 L 0 ${item.w * scale} Z`;
-
-                    if (side === "top") {
-                      svgTop = (item.y + item.h) * scale;
-                      pathD = `M 0 0 A ${item.w * scale} ${item.w * scale} 0 0 0 ${item.w * scale} ${item.w * scale} L 0 0 Z`;
-                    } else if (side === "left") {
-                      svgLeft = (item.x + item.w) * scale;
-                      svgTop = item.y * scale;
-                      svgW = item.h * scale;
-                      svgH = item.h * scale;
-                      pathD = `M 0 0 A ${item.h * scale} ${item.h * scale} 0 0 1 ${item.h * scale} ${item.h * scale} L 0 0 Z`;
-                    } else if (side === "right") {
-                      svgLeft = (item.x - item.h) * scale;
-                      svgTop = item.y * scale;
-                      svgW = item.h * scale;
-                      svgH = item.h * scale;
-                      pathD = `M ${item.h * scale} 0 A ${item.h * scale} ${item.h * scale} 0 0 0 0 ${item.h * scale} L ${item.h * scale} 0 Z`;
-                    }
-
-                    return (
-                      <svg
-                        style={{
-                          position: "absolute",
-                          left: `${svgLeft}px`,
-                          top: `${svgTop}px`,
-                          width: `${svgW}px`,
-                          height: `${svgH}px`,
-                          pointerEvents: "none",
-                          zIndex: 2,
-                        }}
-                      >
-                        <path
-                          d={pathD}
-                          fill="rgba(245, 158, 11, 0.08)"
-                          stroke="#F59E0B"
-                          strokeWidth="1.5"
-                          strokeDasharray="3,3"
-                        />
-                      </svg>
-                    );
-                  })()}
-
+                return (
                   <div
-                    onMouseDown={(e) => handleMouseDown(key, e)}
-                    onClick={() => setSelectedKey(key)}
                     style={{
                       position: "absolute",
-                      left: `${item.x * scale}px`,
-                      top: `${item.y * scale}px`,
-                      width: `${Math.max(8, item.w) * scale}px`,
-                      height: `${Math.max(8, item.h) * scale}px`,
-                      backgroundColor: item.color,
-                      color: "#FFFFFF",
-                      borderRadius: isCabinet ? "2px" : (isDoor || isWindow ? "1px" : "6px"),
+                      left: `${wetLeftIn * scale}px`,
+                      top: `${wetTopIn * scale}px`,
+                      width: `${wetWidthIn * scale}px`,
+                      height: `${wetHeightIn * scale}px`,
+                      backgroundColor: "rgba(14, 165, 233, 0.12)",
+                      border: "1.5px dashed rgba(14, 165, 233, 0.4)",
+                      borderRadius: "6px",
+                      pointerEvents: "none",
                       display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "0.65rem",
+                      alignItems: "flex-end",
+                      justifyContent: "flex-end",
+                      padding: "4px",
+                      fontSize: "0.6rem",
+                      color: "#0EA5E9",
                       fontWeight: "700",
-                      cursor: draggingKey === key ? "grabbing" : "grab",
-                      boxShadow: isSelected ? `0 0 0 3px ${GOLD}, 0 6px 16px rgba(0,0,0,0.6)` : "0 3px 8px rgba(0,0,0,0.4)",
-                      transform: `rotate(${item.rot || 0}deg) ${draggingKey === key ? "scale(1.05)" : "scale(1)"}`,
-                      transition: draggingKey === key ? "none" : "transform 0.15s ease, box-shadow 0.15s ease",
-                      border: isSelected ? "2px solid #FFFFFF" : "1px solid rgba(255,255,255,0.3)",
-                      zIndex: isSelected ? 20 : (isCabinet ? 2 : 10),
-                      textAlign: "center",
-                      padding: "2px",
-                      boxSizing: "border-box",
                     }}
                   >
-                    {!isDoor && !isWindow && (
+                    WET ZONE
+                  </div>
+                );
+              })()}
+
+              {/* Plumbing Lines */}
+              {showPlumbing && items.washbasin && items.toilet && (
+                <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 2 }}>
+                  <line
+                    x1={(items.toilet.x + items.toilet.w / 2) * scale}
+                    y1={(items.toilet.y + items.toilet.h / 2) * scale}
+                    x2={(items.washbasin.x + items.washbasin.w / 2) * scale}
+                    y2={(items.washbasin.y + items.washbasin.h / 2) * scale}
+                    stroke="rgba(218, 157, 73, 0.3)"
+                    strokeWidth="2"
+                    strokeDasharray="4,4"
+                  />
+                </svg>
+              )}
+
+              {/* Render 2D Fixture Blocks */}
+              {Object.keys(items).map((key) => {
+                const item = items[key];
+                const isSelected = selectedKey === key;
+                const isDoor = key === "door" || item.category === "door";
+                const isWindow = key === "window" || item.category === "window";
+                const isCabinet = key === "cabinet";
+
+                return (
+                  <div key={key} style={{ position: "relative" }}>
+                    {showClearances && !isDoor && !isWindow && !isCabinet && (
                       <div
                         style={{
                           position: "absolute",
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: "4px",
-                          backgroundColor: GOLD,
-                          borderRadius: "0 0 4px 4px",
+                          left: `${(item.x - 8) * scale}px`,
+                          top: `${(item.y - 8) * scale}px`,
+                          width: `${(item.w + 16) * scale}px`,
+                          height: `${(item.h + 16) * scale}px`,
+                          border: "1px dashed rgba(245, 158, 11, 0.35)",
+                          borderRadius: "6px",
                           pointerEvents: "none",
+                          zIndex: 1,
                         }}
                       />
                     )}
 
-                    <div style={{ transform: `rotate(${- (item.rot || 0)}deg)`, pointerEvents: "none", whiteSpace: "nowrap" }}>
-                      <div>{item.label}</div>
-                      <div style={{ fontSize: "0.55rem", opacity: 0.85, fontWeight: "400" }}>
-                        {Math.round(item.w)}" × {Math.round(item.h)}"
+                    {isDoor && showClearances && (() => {
+                      const side = item.wallSnapSide || (
+                        item.y <= 10 ? "top" :
+                        item.y >= roomDepthIn - 15 ? "bottom" :
+                        item.x <= 10 ? "left" :
+                        item.x >= roomWidthIn - 15 ? "right" : "bottom"
+                      );
+
+                      let svgLeft = item.x * scale;
+                      let svgTop = (item.y - item.w) * scale;
+                      let svgW = item.w * scale;
+                      let svgH = item.w * scale;
+                      let pathD = `M 0 ${item.w * scale} A ${item.w * scale} ${item.w * scale} 0 0 1 ${item.w * scale} 0 L 0 ${item.w * scale} Z`;
+
+                      if (side === "top") {
+                        svgTop = (item.y + item.h) * scale;
+                        pathD = `M 0 0 A ${item.w * scale} ${item.w * scale} 0 0 0 ${item.w * scale} ${item.w * scale} L 0 0 Z`;
+                      } else if (side === "left") {
+                        svgLeft = (item.x + item.w) * scale;
+                        svgTop = item.y * scale;
+                        svgW = item.h * scale;
+                        svgH = item.h * scale;
+                        pathD = `M 0 0 A ${item.h * scale} ${item.h * scale} 0 0 1 ${item.h * scale} ${item.h * scale} L 0 0 Z`;
+                      } else if (side === "right") {
+                        svgLeft = (item.x - item.h) * scale;
+                        svgTop = item.y * scale;
+                        svgW = item.h * scale;
+                        svgH = item.h * scale;
+                        pathD = `M ${item.h * scale} 0 A ${item.h * scale} ${item.h * scale} 0 0 0 0 ${item.h * scale} L ${item.h * scale} 0 Z`;
+                      }
+
+                      return (
+                        <svg
+                          style={{
+                            position: "absolute",
+                            left: `${svgLeft}px`,
+                            top: `${svgTop}px`,
+                            width: `${svgW}px`,
+                            height: `${svgH}px`,
+                            pointerEvents: "none",
+                            zIndex: 2,
+                          }}
+                        >
+                          <path
+                            d={pathD}
+                            fill="rgba(245, 158, 11, 0.08)"
+                            stroke="#F59E0B"
+                            strokeWidth="1.5"
+                            strokeDasharray="3,3"
+                          />
+                        </svg>
+                      );
+                    })()}
+
+                    <div
+                      onMouseDown={(e) => handleMouseDown(key, e)}
+                      onClick={() => setSelectedKey(key)}
+                      style={{
+                        position: "absolute",
+                        left: `${item.x * scale}px`,
+                        top: `${item.y * scale}px`,
+                        width: `${Math.max(8, item.w) * scale}px`,
+                        height: `${Math.max(8, item.h) * scale}px`,
+                        backgroundColor: item.color,
+                        color: "#FFFFFF",
+                        borderRadius: isCabinet ? "2px" : (isDoor || isWindow ? "1px" : "6px"),
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "0.65rem",
+                        fontWeight: "700",
+                        cursor: draggingKey === key ? "grabbing" : "grab",
+                        boxShadow: isSelected ? `0 0 0 3px ${GOLD}, 0 6px 16px rgba(0,0,0,0.6)` : "0 3px 8px rgba(0,0,0,0.4)",
+                        transform: `rotate(${item.rot || 0}deg) ${draggingKey === key ? "scale(1.05)" : "scale(1)"}`,
+                        transition: draggingKey === key ? "none" : "transform 0.15s ease, box-shadow 0.15s ease",
+                        border: isSelected ? "2px solid #FFFFFF" : "1px solid rgba(255,255,255,0.3)",
+                        zIndex: isSelected ? 20 : (isCabinet ? 2 : 10),
+                        textAlign: "center",
+                        padding: "2px",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {!isDoor && !isWindow && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: "4px",
+                            backgroundColor: GOLD,
+                            borderRadius: "0 0 4px 4px",
+                            pointerEvents: "none",
+                          }}
+                        />
+                      )}
+
+                      <div style={{ transform: `rotate(${- (item.rot || 0)}deg)`, pointerEvents: "none", whiteSpace: "nowrap" }}>
+                        <div>{item.label}</div>
+                        <div style={{ fontSize: "0.55rem", opacity: 0.85, fontWeight: "400" }}>
+                          {Math.round(item.w)}" × {Math.round(item.h)}"
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
+
+          {/* SELECTED TOOL DIMENSIONS & CONTROLS MENU (BELOW 2D PLANNER CANVAS AREA) */}
+          <div style={{
+            padding: "18px 22px",
+            backgroundColor: "rgba(10, 14, 24, 0.35)",
+            borderRadius: "12px",
+            border: `1px solid rgba(255, 255, 255, 0.2)`,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+          }}>
+            {selectedItem ? (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: selectedItem.color, boxShadow: "0 0 8px currentColor" }} />
+                    <span style={{ fontSize: "0.95rem", fontWeight: "800", color: "#F8FAFC", letterSpacing: "0.5px" }}>
+                      Selected Tool: {selectedItem.label}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextRot = ((selectedItem.rot || 0) + 90) % 360;
+                        handlePropChange(selectedKey, "rot", nextRot);
+                      }}
+                      style={{
+                        padding: "6px 14px",
+                        backgroundColor: GOLD,
+                        color: "#08090C",
+                        border: "none",
+                        borderRadius: "6px",
+                        fontSize: "0.78rem",
+                        fontWeight: "800",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Rotate 90° ({selectedItem.rot || 0}°)
+                    </button>
+
+                    {!["washbasin", "toilet", "door"].includes(selectedKey) && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(selectedKey)}
+                        style={{
+                          padding: "6px 14px",
+                          backgroundColor: "rgba(239, 68, 68, 0.2)",
+                          color: "#EF4444",
+                          border: "1px solid #EF4444",
+                          borderRadius: "6px",
+                          fontSize: "0.78rem",
+                          fontWeight: "700",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
+                      Width (inches): {selectedItem.w}"
+                    </label>
+                    <input
+                      type="range"
+                      min={selectedItem.minW || 10}
+                      max={selectedItem.maxW || 80}
+                      value={selectedItem.w}
+                      onChange={(e) => handlePropChange(selectedKey, "w", e.target.value)}
+                      style={{ width: "100%", accentColor: GOLD }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
+                      Depth / Length (inches): {selectedItem.h}"
+                    </label>
+                    <input
+                      type="range"
+                      min={selectedItem.minH || 10}
+                      max={selectedItem.maxH || 80}
+                      value={selectedItem.h}
+                      onChange={(e) => handlePropChange(selectedKey, "h", e.target.value)}
+                      style={{ width: "100%", accentColor: GOLD }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: "700", color: GOLD, marginBottom: "4px" }}>
+                      Height (inches): {selectedItem.heightIn || 30}"
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="96"
+                      value={selectedItem.heightIn || 30}
+                      onChange={(e) => handlePropChange(selectedKey, "heightIn", e.target.value)}
+                      style={{ width: "100%", accentColor: GOLD }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: "0.85rem", color: TEXT_MUTED, textAlign: "center", padding: "10px 0" }}>
+                Select an element on the 2D layout canvas above to inspect and adjust its dimensions.
+              </div>
+            )}
+          </div>
+
         </div>
 
-        {/* Right Column: Controls Sidebar & Property Inspector */}
+        {/* Right Column: Controls Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
+          {/* Room Dimensions & Specifications Card */}
+          <div style={{
+            padding: "16px",
+            backgroundColor: "rgba(10, 14, 24, 0.35)",
+            borderRadius: "10px",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+          }}>
+            <div style={{ fontSize: "0.75rem", fontWeight: "700", color: GOLD, marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Room Dimensions & Specs
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {setRoomWidthFt && (
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "4px" }}>
+                    Room Width (X): {roomWidthFt} ft
+                  </label>
+                  <input
+                    type="range"
+                    min="4"
+                    max="20"
+                    step="0.5"
+                    value={roomWidthFt}
+                    onChange={(e) => setRoomWidthFt(parseFloat(e.target.value))}
+                    style={{ width: "100%", accentColor: GOLD }}
+                  />
+                </div>
+              )}
+
+              {setRoomDepthFt && (
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "4px" }}>
+                    Room Length (Y): {roomDepthFt} ft
+                  </label>
+                  <input
+                    type="range"
+                    min="4"
+                    max="20"
+                    step="0.5"
+                    value={roomDepthFt}
+                    onChange={(e) => setRoomDepthFt(parseFloat(e.target.value))}
+                    style={{ width: "100%", accentColor: GOLD }}
+                  />
+                </div>
+              )}
+
+              {setRoomHeightFt && (
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "4px" }}>
+                    Ceiling Height (Z): {roomHeightFt} ft
+                  </label>
+                  <input
+                    type="range"
+                    min="7"
+                    max="14"
+                    step="0.5"
+                    value={roomHeightFt}
+                    onChange={(e) => setRoomHeightFt(parseFloat(e.target.value))}
+                    style={{ width: "100%", accentColor: GOLD }}
+                  />
+                </div>
+              )}
+
+              {setBudgetInr && (
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "4px" }}>
+                    Budget (INR)
+                  </label>
+                  <input
+                    type="number"
+                    step="10000"
+                    min="0"
+                    value={budgetInr ?? 0}
+                    onChange={(e) => setBudgetInr(parseInt(e.target.value) || 0)}
+                    style={{
+                      width: "100%",
+                      padding: "6px 10px",
+                      backgroundColor: "#161B26",
+                      border: `1px solid ${BORDER_COLOR}`,
+                      borderRadius: "6px",
+                      color: "#F8FAFC",
+                      fontSize: "0.85rem",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              )}
+
+              {setAestheticTheme && (
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "4px" }}>
+                    Aesthetic Style Theme
+                  </label>
+                  <select
+                    value={aestheticTheme || "Minimalist Modern"}
+                    onChange={(e) => setAestheticTheme(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "6px 10px",
+                      backgroundColor: "#161B26",
+                      border: `1px solid ${BORDER_COLOR}`,
+                      borderRadius: "6px",
+                      color: "#F8FAFC",
+                      fontSize: "0.85rem",
+                      outline: "none",
+                      cursor: "pointer",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <option value="Minimalist Modern">Minimalist Modern</option>
+                    <option value="Classic Luxury">Classic Luxury</option>
+                    <option value="Japanese Zen">Japanese Zen</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Surface Themes Dropdowns Card */}
-          <div style={{ padding: "16px", backgroundColor: "#0B0E14", borderRadius: "8px", border: `1px solid ${BORDER_COLOR}` }}>
+          <div style={{
+            padding: "16px",
+            backgroundColor: "rgba(10, 14, 24, 0.35)",
+            borderRadius: "10px",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+          }}>
 
             {/* Floor Surface Theme Dropdown */}
             <div style={{ marginBottom: "16px" }}>
@@ -819,7 +1066,17 @@ export default function LayoutPlanner2D({
           </div>
 
           {/* Feature Toggles */}
-          <div style={{ padding: "14px 16px", backgroundColor: "#0B0E14", borderRadius: "8px", border: `1px solid ${BORDER_COLOR}`, display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.78rem", color: TEXT_MUTED }}>
+          <div style={{
+            padding: "14px 16px",
+            backgroundColor: "rgba(10, 14, 24, 0.35)",
+            borderRadius: "10px",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            fontSize: "0.78rem",
+            color: TEXT_MUTED,
+          }}>
             <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
               <input
                 type="checkbox"
@@ -858,109 +1115,9 @@ export default function LayoutPlanner2D({
             </label>
           </div>
 
-          {/* Property Inspector Card (on the side, without Snapped to Wall badge) */}
-          {selectedItem && (
-            <div style={{ padding: "16px", backgroundColor: "#0B0E14", borderRadius: "8px", border: `1px solid ${BORDER_COLOR}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: selectedItem.color }} />
-                  <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "#F8FAFC" }}>
-                    {selectedItem.label}
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextRot = ((selectedItem.rot || 0) + 90) % 360;
-                      handlePropChange(selectedKey, "rot", nextRot);
-                    }}
-                    style={{
-                      padding: "4px 8px",
-                      backgroundColor: GOLD,
-                      color: "#08090C",
-                      border: "none",
-                      borderRadius: "4px",
-                      fontSize: "0.7rem",
-                      fontWeight: "700",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Rotate 90° ({selectedItem.rot || 0}°)
-                  </button>
-
-                  {!["washbasin", "toilet", "door"].includes(selectedKey) && (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(selectedKey)}
-                      style={{
-                        padding: "4px 8px",
-                        backgroundColor: "rgba(239, 68, 68, 0.2)",
-                        color: "#EF4444",
-                        border: "1px solid #EF4444",
-                        borderRadius: "4px",
-                        fontSize: "0.7rem",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "2px" }}>
-                    Width (inches): {selectedItem.w}"
-                  </label>
-                  <input
-                    type="range"
-                    min={selectedItem.minW || 10}
-                    max={selectedItem.maxW || 80}
-                    value={selectedItem.w}
-                    onChange={(e) => handlePropChange(selectedKey, "w", e.target.value)}
-                    style={{ width: "100%", accentColor: GOLD }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "2px" }}>
-                    Depth / Length (inches): {selectedItem.h}"
-                  </label>
-                  <input
-                    type="range"
-                    min={selectedItem.minH || 10}
-                    max={selectedItem.maxH || 80}
-                    value={selectedItem.h}
-                    onChange={(e) => handlePropChange(selectedKey, "h", e.target.value)}
-                    style={{ width: "100%", accentColor: GOLD }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "2px" }}>
-                    Height (inches): {selectedItem.heightIn || 30}"
-                  </label>
-                  <input
-                    type="range"
-                    min="10"
-                    max="96"
-                    value={selectedItem.heightIn || 30}
-                    onChange={(e) => handlePropChange(selectedKey, "heightIn", e.target.value)}
-                    style={{ width: "100%", accentColor: GOLD }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
 
       </div>
     </div>
   );
 }
-
