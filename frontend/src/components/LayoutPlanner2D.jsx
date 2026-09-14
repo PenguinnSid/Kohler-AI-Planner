@@ -1,208 +1,397 @@
 import { useState, useRef, useEffect } from "react";
 
-const ORANGE = "#D97E3A";
-const DARK_ORANGE = "#B86A2A";
-const PEACH = "#E8B4A0";
-const WHITE = "#FFFFFF";
+const GOLD = "#FFFFFF";
+const DARK_CARD = "#10141D";
+const BORDER_COLOR = "#232D3F";
+const TEXT_MUTED = "#94A3B8";
 
+// Theme Swatch Preset Definitions
+export const FLOOR_THEMES = [
+  { id: "marble", name: "Carrara Marble", color: "#EAE6DF", border: "#CCCCCC", accent: "#B0A89C" },
+  { id: "slate", name: "Dark Slate Tile", color: "#1F2937", border: "#374151", accent: "#4B5563" },
+  { id: "wood", name: "Warm Bamboo", color: "#C59B6D", border: "#A07648", accent: "#805528" },
+  { id: "hex", name: "Hexagon Ceramic", color: "#E2E8F0", border: "#CBD5E1", accent: "#94A3B8" },
+  { id: "concrete", name: "Matte Concrete", color: "#64748B", border: "#475569", accent: "#334155" },
+];
+
+export const WALL_THEMES = [
+  { id: "subway", name: "White Subway", color: "#F8FAFC", border: "#E2E8F0", pattern: "subway" },
+  { id: "marble", name: "Italian Marble", color: "#F1F5F9", border: "#CBD5E1", pattern: "veins" },
+  { id: "wood", name: "Wood Paneling", color: "#D8C4B6", border: "#B89D88", pattern: "wood" },
+  { id: "slate", name: "Charcoal Slate", color: "#1E293B", border: "#334155", pattern: "slate" },
+  { id: "travertine", name: "Sandstone", color: "#E5D3B3", border: "#C8B28C", pattern: "stone" },
+];
+
+// Helper to test rectangular box collisions
 function isColliding(a, b) {
+  if (!a || !b) return false;
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
-export default function LayoutPlanner2D({ roomWidthFt, roomDepthFt, customLayout, onChange, onReset }) {
-  const roomWidthIn = roomWidthFt * 12;
-  const roomDepthIn = roomDepthFt * 12;
+// Helper to check if a fixture intersects the 90-degree door swing arc
+export function doesInterfereWithDoor(item, door, roomWidthIn, roomDepthIn) {
+  if (!item || !door) return false;
+  if (item === door) return false;
+  if (item.category === "mirror" || item.category === "window") return false;
 
-  // Scale 2D room box to fit 340px container max width
-  const maxDisplayWidth = 340;
+  const side = door.wallSnapSide || (
+    door.y <= 10 ? "top" :
+    door.y >= roomDepthIn - 15 ? "bottom" :
+    door.x <= 10 ? "left" :
+    door.x >= roomWidthIn - 15 ? "right" : "bottom"
+  );
+
+  let cx = door.x;
+  let cy = door.y;
+  let R = door.w;
+  let boxX = door.x;
+  let boxY = door.y - R;
+  let boxW = R;
+  let boxH = R;
+
+  if (side === "bottom") {
+    cx = door.x;
+    cy = door.y;
+    R = door.w;
+    boxX = door.x;
+    boxY = door.y - R;
+    boxW = R;
+    boxH = R;
+  } else if (side === "top") {
+    cx = door.x;
+    cy = door.y + door.h;
+    R = door.w;
+    boxX = door.x;
+    boxY = door.y + door.h;
+    boxW = R;
+    boxH = R;
+  } else if (side === "left") {
+    cx = door.x + door.w;
+    cy = door.y;
+    R = door.h;
+    boxX = door.x + door.w;
+    boxY = door.y;
+    boxW = R;
+    boxH = R;
+  } else if (side === "right") {
+    cx = door.x;
+    cy = door.y;
+    R = door.h;
+    boxX = door.x - R;
+    boxY = door.y;
+    boxW = R;
+    boxH = R;
+  }
+
+  // 1. Quick bounding box check
+  const bBox = { x: boxX, y: boxY, w: boxW, h: boxH };
+  if (!isColliding(item, bBox)) return false;
+
+  // 2. Exact Circle-Rectangle distance test to hinge (cx, cy)
+  const closestX = Math.max(item.x, Math.min(cx, item.x + item.w));
+  const closestY = Math.max(item.y, Math.min(cy, item.y + item.h));
+  const dx = closestX - cx;
+  const dy = closestY - cy;
+  return (dx * dx + dy * dy) < (R * R);
+}
+
+export function hasIllegalOverlap(proposedState, roomWidthIn, roomDepthIn) {
+  const keys = Object.keys(proposedState);
+
+  // 1. Check inter-fixture collisions
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const kA = keys[i];
+      const kB = keys[j];
+      if ((kA === "washbasin" && kB === "cabinet") || (kA === "cabinet" && kB === "washbasin")) continue;
+      if (kA === "mirror" || kB === "mirror") continue;
+      if (kA === "window" || kB === "window") continue;
+
+      if (isColliding(proposedState[kA], proposedState[kB])) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Check door swing arc interference
+  const doorItem = proposedState.door;
+  if (doorItem) {
+    for (const key of keys) {
+      if (key === "door" || key === "window" || key === "mirror") continue;
+      if (doesInterfereWithDoor(proposedState[key], doorItem, roomWidthIn, roomDepthIn)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+export default function LayoutPlanner2D({
+  roomWidthFt = 8,
+  roomDepthFt = 6,
+  roomHeightFt = 9,
+  floorTheme = "marble",
+  wallTheme = "subway",
+  onFloorThemeChange,
+  onWallThemeChange,
+  itemsState,
+  onItemsStateChange,
+  onReset,
+}) {
+  const roomWidthIn = Math.max(36, roomWidthFt * 12);
+  const roomDepthIn = Math.max(36, roomDepthFt * 12);
+
+  // Helper to adjust wall-snapped and bounded items when room width or depth increases or decreases
+  useEffect(() => {
+    if (!itemsState) return;
+    let changed = false;
+    const updated = { ...itemsState };
+
+    Object.keys(updated).forEach((key) => {
+      const item = updated[key];
+      let newX = item.x;
+      let newY = item.y;
+      let wallSnapSide = item.wallSnapSide;
+
+      const isBottom = wallSnapSide === "bottom" || (item.y + item.h >= roomDepthIn - 14);
+      const isRight = wallSnapSide === "right" || (item.x + item.w >= roomWidthIn - 14);
+      const isTop = wallSnapSide === "top" || item.y <= 4;
+      const isLeft = wallSnapSide === "left" || item.x <= 4;
+
+      if (isBottom) {
+        const targetY = Math.max(0, roomDepthIn - item.h);
+        if (newY !== targetY) {
+          newY = targetY;
+          changed = true;
+        }
+        wallSnapSide = "bottom";
+      } else if (isTop) {
+        if (newY !== 0) {
+          newY = 0;
+          changed = true;
+        }
+        wallSnapSide = "top";
+      } else if (newY + item.h > roomDepthIn) {
+        newY = Math.max(0, roomDepthIn - item.h);
+        changed = true;
+      }
+
+      if (isRight) {
+        const targetX = Math.max(0, roomWidthIn - item.w);
+        if (newX !== targetX) {
+          newX = targetX;
+          changed = true;
+        }
+        wallSnapSide = "right";
+      } else if (isLeft) {
+        if (newX !== 0) {
+          newX = 0;
+          changed = true;
+        }
+        wallSnapSide = "left";
+      } else if (newX + item.w > roomWidthIn) {
+        newX = Math.max(0, roomWidthIn - item.w);
+        changed = true;
+      }
+
+      if (changed) {
+        updated[key] = { ...item, x: newX, y: newY, wallSnapSide };
+      }
+    });
+
+    if (changed) {
+      onItemsStateChange?.(updated);
+    }
+  }, [roomWidthIn, roomDepthIn]);
+
+  // Scaled display canvas sizing with generous margins
+  const maxDisplayWidth = 440;
   const scale = maxDisplayWidth / roomWidthIn;
   const displayWidth = maxDisplayWidth;
   const displayHeight = roomDepthIn * scale;
 
   const containerRef = useRef(null);
-  const [selectedItemKey, setSelectedItemKey] = useState("washbasin");
-  const [draggingItem, setDraggingItem] = useState(null);
+  const [selectedKey, setSelectedKey] = useState("washbasin");
+  const [draggingKey, setDraggingKey] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-  // Default positions & dimensions in inches
-  const [itemsState, setItemsState] = useState({
-    toilet: { x: 2, y: 2, w: 16, h: 24, rot: 0, label: "Toilet", color: "#2563EB", minW: 14, maxW: 24, minH: 18, maxH: 32 },
-    washbasin: { x: Math.max(2, roomWidthIn - 28), y: 6, w: 20, h: 16, rot: 0, label: "Washbasin", color: "#059669", minW: 14, maxW: 36, minH: 12, maxH: 26 },
-    cabinet: { x: Math.max(0, roomWidthIn - 34), y: 3, w: 26, h: 22, rot: 0, label: "Cabinet (+3\" Margin)", color: "#3B82F6", minW: 20, maxW: 48, minH: 18, maxH: 32 },
-    bathtub: { x: 2, y: Math.max(2, roomDepthIn - 34), w: 60, h: 30, rot: 0, label: "Bathtub / Shower", color: "#7C3AED", minW: 30, maxW: 72, minH: 30, maxH: 72 },
-    window: { x: Math.max(0, roomWidthIn / 2 - 20), y: 0, w: 40, h: 3, rot: 0, label: "Window", color: "#0284C7", minW: 20, maxW: 60, minH: 3, maxH: 3 },
-    door: { x: Math.max(2, roomWidthIn / 2 - 16), y: roomDepthIn - 3, w: 32, h: 3, rot: 180, label: "Door", color: "#B45309", minW: 24, maxW: 42, minH: 3, maxH: 3 },
-  });
+  // Toggles for bathroom engineering & planning features
+  const [showWetDryZones, setShowWetDryZones] = useState(true);
+  const [showClearances, setShowClearances] = useState(true);
+  const [showPlumbing, setShowPlumbing] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(true);
 
-  // Sync custom layout prop if provided
-  useEffect(() => {
-    if (customLayout) {
-      setItemsState((prev) => {
-        const next = { ...prev };
-        Object.keys(customLayout).forEach((key) => {
-          if (next[key]) {
-            next[key] = {
-              ...next[key],
-              x: customLayout[key].x ?? next[key].x,
-              y: customLayout[key].y ?? next[key].y,
-              w: customLayout[key].w ?? next[key].w,
-              h: customLayout[key].h ?? next[key].h,
-              rot: customLayout[key].rot ?? next[key].rot ?? 0,
-            };
-          }
-        });
-        return next;
-      });
-    }
-  }, [customLayout]);
-
-  // Helper to notify parent form of layout changes with 3-inch cabinet rule enforced
-  const emitChange = (newState) => {
-    const sinkW = newState.washbasin.w;
-    const sinkH = newState.washbasin.h;
-    const minCabW = sinkW + 6;
-    const minCabH = sinkH + 6;
-
-    const cabW = Math.max(minCabW, newState.cabinet.w);
-    const cabH = Math.max(minCabH, newState.cabinet.h);
-
-    const payload = {
-      toilet: { x: newState.toilet.x, y: newState.toilet.y, w: newState.toilet.w, h: newState.toilet.h, rot: newState.toilet.rot || 0 },
-      washbasin: { x: newState.washbasin.x, y: newState.washbasin.y, w: newState.washbasin.w, h: newState.washbasin.h, rot: newState.washbasin.rot || 0 },
-      cabinet: { x: newState.washbasin.x - 3, y: Math.max(0, newState.washbasin.y - 3), w: cabW, h: cabH, rot: newState.washbasin.rot || 0 },
-      bathtub: { x: newState.bathtub.x, y: newState.bathtub.y, w: newState.bathtub.w, h: newState.bathtub.h, rot: newState.bathtub.rot || 0 },
-      window: { x: newState.window.x, y: newState.window.y, w: newState.window.w, h: newState.window.h, rot: newState.window.rot || 0 },
-      door: { x: newState.door.x, y: newState.door.y, w: newState.door.w, h: newState.door.h, rot: newState.door.rot || 0 },
-    };
-
-    onChange?.(payload);
+  // Default fixture state dictionary (in inches)
+  const defaultItems = {
+    toilet: { x: 4, y: 4, w: 16, h: 26, heightIn: 18, rot: 0, label: "Toilet", color: "#3B82F6", minW: 14, maxW: 24, minH: 18, maxH: 34, category: "toilet" },
+    washbasin: { x: Math.max(4, roomWidthIn - 32), y: 6, w: 22, h: 18, heightIn: 32, rot: 0, label: "Washbasin", color: "#10B981", minW: 14, maxW: 42, minH: 12, maxH: 28, category: "washbasin", wallSnapSide: "top" },
+    cabinet: { x: Math.max(1, roomWidthIn - 38), y: 3, w: 28, h: 24, heightIn: 28, rot: 0, label: "Vanity Cabinet", color: "#2563EB", minW: 18, maxW: 60, minH: 16, maxH: 36, category: "cabinet", wallSnapSide: "top" },
+    bathtub: { x: 4, y: Math.max(4, roomDepthIn - 36), w: 60, h: 32, heightIn: 22, rot: 0, label: "Bathtub / Shower", color: "#8B5CF6", minW: 30, maxW: 78, minH: 28, maxH: 72, category: "bathtub" },
+    window: { x: Math.max(0, roomWidthIn / 2 - 20), y: 0, w: 40, h: 4, heightIn: 30, elevationIn: 54, rot: 0, label: "Window", color: "#0EA5E9", minW: 20, maxW: 72, minH: 3, maxH: 6, category: "window", isWallItem: true, wallSnapSide: "top" },
+    door: { x: Math.max(4, roomWidthIn / 2 - 16), y: roomDepthIn - 4, w: 32, h: 4, heightIn: 84, rot: 180, label: "Door", color: "#F59E0B", minW: 24, maxW: 42, minH: 3, maxH: 6, category: "door", isWallItem: true, wallSnapSide: "bottom" },
+    mirror: { x: Math.max(1, roomWidthIn - 38), y: 0, w: 28, h: 3, heightIn: 30, elevationIn: 40, rot: 0, label: "Vanity Mirror", color: "#EC4899", minW: 14, maxW: 48, minH: 2, maxH: 4, category: "mirror", isWallItem: true, wallSnapSide: "top" },
+    towel_bar: { x: 0, y: Math.max(4, roomDepthIn / 2 - 12), w: 3, h: 24, heightIn: 4, elevationIn: 44, rot: 90, label: "Towel Bar", color: "#14B8A6", minW: 3, maxW: 4, minH: 12, maxH: 36, category: "towel_bar", isWallItem: true, wallSnapSide: "left" },
   };
 
+  const items = itemsState || defaultItems;
+
+  const updateItemsState = (nextState) => {
+    onItemsStateChange?.(nextState);
+  };
+
+  // Drag start handler
   const handleMouseDown = (key, e) => {
     e.preventDefault();
-    setSelectedItemKey(key);
+    e.stopPropagation();
+    setSelectedKey(key);
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const item = itemsState[key];
+    const item = items[key];
+    if (!item) return;
+
     const mouseXIn = (e.clientX - rect.left) / scale;
     const mouseYIn = (e.clientY - rect.top) / scale;
 
-    setDraggingItem(key);
+    setDraggingKey(key);
     setDragOffset({
       x: mouseXIn - item.x,
       y: mouseYIn - item.y,
     });
   };
 
+  // Mouse move drag handler with logical wall snapping & wall orientation alignment
   const handleMouseMove = (e) => {
-    if (!draggingItem || !containerRef.current) return;
+    if (!draggingKey || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const mouseXIn = (e.clientX - rect.left) / scale;
     const mouseYIn = (e.clientY - rect.top) / scale;
 
-    const currentItem = itemsState[draggingItem];
-    let newX = Math.max(0, Math.min(roomWidthIn - currentItem.w, mouseXIn - dragOffset.x));
-    let newY = Math.max(0, Math.min(roomDepthIn - currentItem.h, mouseYIn - dragOffset.y));
+    const currentItem = items[draggingKey];
+    if (!currentItem) return;
 
-    // Snap wall fixtures (window, door) to nearest wall edge and make them thin along that wall
+    let newX = mouseXIn - dragOffset.x;
+    let newY = mouseYIn - dragOffset.y;
+
+    if (snapToGrid) {
+      newX = Math.round(newX / 6) * 6;
+      newY = Math.round(newY / 6) * 6;
+    }
+
     let newRot = currentItem.rot || 0;
     let newW = currentItem.w;
     let newH = currentItem.h;
+    let wallSnapSide = currentItem.wallSnapSide || null;
 
-    if (draggingItem === "window" || draggingItem === "door") {
+    // Wall Snapping check for wall items as well as washbasin and cabinet
+    const isWallSnappable = currentItem.isWallItem || draggingKey === "door" || draggingKey === "window" || draggingKey === "washbasin" || draggingKey === "cabinet" || draggingKey === "mirror";
+
+    if (isWallSnappable) {
+      const isNarrowWallItem = currentItem.isWallItem || draggingKey === "door" || draggingKey === "window";
+      const wallThickness = 4;
       const distTop = newY;
       const distBottom = roomDepthIn - (newY + currentItem.h);
       const distLeft = newX;
       const distRight = roomWidthIn - (newX + currentItem.w);
-
       const minDist = Math.min(distTop, distBottom, distLeft, distRight);
       const span = Math.max(currentItem.w, currentItem.h);
 
-      if (minDist === distTop && distTop < 24) {
+      if (minDist === distTop && distTop < 20) {
         newY = 0;
-        newW = span;
-        newH = 3;
+        if (isNarrowWallItem) { newW = span; newH = wallThickness; }
         newRot = 0;
-      } else if (minDist === distBottom && distBottom < 24) {
-        newY = roomDepthIn - 3;
-        newW = span;
-        newH = 3;
+        wallSnapSide = "top";
+      } else if (minDist === distBottom && distBottom < 20) {
+        newY = roomDepthIn - (isNarrowWallItem ? wallThickness : currentItem.h);
+        if (isNarrowWallItem) { newW = span; newH = wallThickness; }
         newRot = 180;
-      } else if (minDist === distLeft && distLeft < 24) {
+        wallSnapSide = "bottom";
+      } else if (minDist === distLeft && distLeft < 20) {
         newX = 0;
-        newW = 3;
-        newH = span;
+        if (isNarrowWallItem) { newW = wallThickness; newH = span; }
         newRot = 90;
-      } else if (minDist === distRight && distRight < 24) {
-        newX = roomWidthIn - 3;
-        newW = 3;
-        newH = span;
+        wallSnapSide = "left";
+      } else if (minDist === distRight && distRight < 20) {
+        newX = roomWidthIn - (isNarrowWallItem ? wallThickness : currentItem.w);
+        if (isNarrowWallItem) { newW = wallThickness; newH = span; }
         newRot = 270;
+        wallSnapSide = "right";
       }
     }
 
-    const roundX = Math.round(newX * 10) / 10;
-    const roundY = Math.round(newY * 10) / 10;
+    newX = Math.max(0, Math.min(roomWidthIn - newW, newX));
+    newY = Math.max(0, Math.min(roomDepthIn - newH, newY));
+
+    if (!currentItem.isWallItem && draggingKey !== "cabinet") {
+      const cX = newX + newW / 2;
+      const cY = newY + newH / 2;
+      const distTop = cY;
+      const distBottom = roomDepthIn - cY;
+      const distLeft = cX;
+      const distRight = roomWidthIn - cX;
+      const minDist = Math.min(distTop, distBottom, distLeft, distRight);
+
+      if (minDist === distTop) newRot = 0;
+      else if (minDist === distBottom) newRot = 180;
+      else if (minDist === distLeft) newRot = 90;
+      else if (minDist === distRight) newRot = 270;
+    }
 
     const proposedState = {
-      ...itemsState,
-      [draggingItem]: {
+      ...items,
+      [draggingKey]: {
         ...currentItem,
-        x: roundX,
-        y: roundY,
+        x: Math.round(newX * 10) / 10,
+        y: Math.round(newY * 10) / 10,
         w: newW,
         h: newH,
         rot: newRot,
+        wallSnapSide,
       },
     };
 
-    // If washbasin moves, sync cabinet automatically to same wall
-    if (draggingItem === "washbasin") {
+    if (draggingKey === "washbasin" && proposedState.cabinet) {
       proposedState.cabinet = {
         ...proposedState.cabinet,
-        x: Math.max(0, roundX - 3),
-        y: Math.max(0, roundY - 3),
-        rot: currentItem.rot || 0,
+        x: Math.max(0, proposedState.washbasin.x - 3),
+        y: Math.max(0, proposedState.washbasin.y - 3),
+        w: proposedState.washbasin.w + 6,
+        h: proposedState.washbasin.h + 6,
+        rot: proposedState.washbasin.rot,
+        wallSnapSide: proposedState.washbasin.wallSnapSide,
       };
     }
 
-    // Overlap Validation: No fixtures other than Washbasin & Cabinet may overlap!
-    let hasIllegalOverlap = false;
+    let illegalOverlap = false;
     const keys = Object.keys(proposedState);
 
     for (let i = 0; i < keys.length; i++) {
       for (let j = i + 1; j < keys.length; j++) {
         const kA = keys[i];
         const kB = keys[j];
-
-        // Sink and Cabinet Counter Platform ARE allowed to overlap
         if ((kA === "washbasin" && kB === "cabinet") || (kA === "cabinet" && kB === "washbasin")) continue;
-        // Mirror and Sink/Cabinet ARE allowed to align on wall
-        if (kA === "mirror" || kB === "mirror") {
-          if (kA === "washbasin" || kB === "washbasin" || kA === "cabinet" || kB === "cabinet") continue;
-        }
+        if (kA === "mirror" || kB === "mirror") continue;
+        if (kA === "window" || kB === "window") continue;
 
         if (isColliding(proposedState[kA], proposedState[kB])) {
-          hasIllegalOverlap = true;
+          illegalOverlap = true;
           break;
         }
       }
-      if (hasIllegalOverlap) break;
+      if (illegalOverlap) break;
     }
 
-    // If valid non-overlapping position, apply state update
-    if (!hasIllegalOverlap) {
-      setItemsState(proposedState);
-      emitChange(proposedState);
+    if (!illegalOverlap) {
+      updateItemsState(proposedState);
     }
   };
 
   const handleMouseUp = () => {
-    setDraggingItem(null);
+    setDraggingKey(null);
   };
 
   useEffect(() => {
-    if (draggingItem) {
+    if (draggingKey) {
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
       return () => {
@@ -210,241 +399,556 @@ export default function LayoutPlanner2D({ roomWidthFt, roomDepthFt, customLayout
         window.removeEventListener("mouseup", handleMouseUp);
       };
     }
-  }, [draggingItem, dragOffset, itemsState]);
+  }, [draggingKey, dragOffset, items, snapToGrid]);
 
-  const handleDimensionChange = (key, dim, val) => {
+  const handlePropChange = (key, prop, val) => {
     const numVal = parseFloat(val) || 0;
-    const current = itemsState[key];
-    const updated = {
-      ...itemsState,
-      [key]: {
-        ...current,
-        [dim]: numVal,
-      },
-    };
+    const item = items[key];
+    if (!item) return;
 
-    // If washbasin size changes, enforce cabinet is at least 3" bigger on each side & update mirror width
-    if (key === "washbasin") {
-      const minCabW = updated.washbasin.w + 6;
-      const minCabH = updated.washbasin.h + 6;
-      updated.cabinet.w = Math.max(minCabW, updated.cabinet.w);
-      updated.cabinet.h = Math.max(minCabH, updated.cabinet.h);
-      updated.mirror.w = updated.washbasin.w;
-      updated.mirror.x = updated.washbasin.x;
-      updated.mirror.y = 0;
-      updated.mirror.h = 3;
+    let updatedItem = { ...item, [prop]: numVal };
+
+    // Wall Attachment Adjustment when element dimensions change
+    const isSnappedBottom = item.wallSnapSide === "bottom" || (item.y + item.h >= roomDepthIn - 4);
+    const isSnappedRight = item.wallSnapSide === "right" || (item.x + item.w >= roomWidthIn - 4);
+    const isSnappedTop = item.wallSnapSide === "top" || item.y <= 2;
+    const isSnappedLeft = item.wallSnapSide === "left" || item.x <= 2;
+
+    if (prop === "h") {
+      if (isSnappedBottom) {
+        updatedItem.y = Math.max(0, roomDepthIn - numVal);
+      } else if (isSnappedTop) {
+        updatedItem.y = 0;
+      }
+    } else if (prop === "w") {
+      if (isSnappedRight) {
+        updatedItem.x = Math.max(0, roomWidthIn - numVal);
+      } else if (isSnappedLeft) {
+        updatedItem.x = 0;
+      }
     }
 
-    setItemsState(updated);
-    emitChange(updated);
+    let updatedItems = { ...items, [key]: updatedItem };
+
+    if (key === "washbasin" && updatedItems.cabinet) {
+      const cabW = updatedItem.w + 6;
+      const cabH = updatedItem.h + 6;
+      let cabX = Math.max(0, updatedItem.x - 3);
+      let cabY = Math.max(0, updatedItem.y - 3);
+
+      if (isSnappedBottom) cabY = Math.max(0, roomDepthIn - cabH);
+      if (isSnappedTop) cabY = 0;
+      if (isSnappedRight) cabX = Math.max(0, roomWidthIn - cabW);
+      if (isSnappedLeft) cabX = 0;
+
+      updatedItems.cabinet = {
+        ...updatedItems.cabinet,
+        w: cabW,
+        h: cabH,
+        x: cabX,
+        y: cabY,
+        wallSnapSide: updatedItem.wallSnapSide,
+      };
+    }
+
+    updateItemsState(updatedItems);
   };
 
-  const selectedItem = itemsState[selectedItemKey];
+  const removeItem = (key) => {
+    if (key === "washbasin" || key === "toilet" || key === "door") return;
+    const copy = { ...items };
+    delete copy[key];
+    updateItemsState(copy);
+    setSelectedKey("washbasin");
+  };
+
+  const selectedItem = items[selectedKey];
+  const selectedFloorObj = FLOOR_THEMES.find((t) => t.id === floorTheme) || FLOOR_THEMES[0];
+  const selectedWallObj = WALL_THEMES.find((t) => t.id === wallTheme) || WALL_THEMES[0];
 
   return (
-    <div style={{ marginTop: "12px", marginBottom: "16px", backgroundColor: "#1E293B", borderRadius: "8px", border: `1px solid #334155`, padding: "14px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-        <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "#FFD166" }}>
-          Interactive 2D Room & Dimension Painter
-        </span>
+    <div style={{
+      backgroundColor: DARK_CARD,
+      border: `1px solid ${BORDER_COLOR}`,
+      borderRadius: "12px",
+      padding: "24px",
+      boxShadow: "0 12px 36px rgba(0,0,0,0.5)",
+    }}>
+      {/* Top Header Bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <div>
+          <h3 style={{ margin: "0 0 4px 0", color: "#F8FAFC", fontSize: "1.2rem", fontWeight: "700" }}>
+            2D Layout Planner
+          </h3>
+        </div>
+
         <button
           type="button"
-          onClick={onReset}
+          onClick={() => onReset?.()}
           style={{
-            fontSize: "0.75rem",
-            color: ORANGE,
-            background: "none",
-            border: "none",
-            textDecoration: "underline",
-            cursor: "pointer",
+            padding: "6px 14px",
+            backgroundColor: "transparent",
+            border: `1px solid ${GOLD}`,
+            color: GOLD,
+            borderRadius: "6px",
+            fontSize: "0.8rem",
             fontWeight: "600",
+            cursor: "pointer",
           }}
         >
-          Reset All
+          Reset Layout
         </button>
       </div>
 
-      <div style={{ fontSize: "0.75rem", color: "#94A3B8", marginBottom: "10px" }}>
-        Drag blocks to position fixtures. Click any item to adjust size or rotate orientation:
-      </div>
+      {/* Side-by-Side Main Grid: 2D Canvas Left, Controls & Property Inspector Right */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "24px", alignItems: "start" }}>
 
-      {/* 2D Canvas Floorplan Grid */}
-      <div
-        ref={containerRef}
-        style={{
+        {/* Left Column: 2D Interactive Canvas Container */}
+        <div style={{
           position: "relative",
-          width: `${displayWidth}px`,
-          height: `${displayHeight}px`,
-          backgroundColor: "#0F172A",
-          border: `2px dashed ${ORANGE}`,
-          borderRadius: "6px",
-          overflow: "hidden",
-          margin: "0 auto 12px auto",
-          backgroundImage: `
-            linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)
-          `,
-          backgroundSize: `${12 * scale}px ${12 * scale}px`, // 1-foot grid lines
-          userSelect: "none",
-          boxShadow: "inset 0 2px 6px rgba(0,0,0,0.4)",
-        }}
-      >
-        <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", fontSize: "0.6rem", color: "#64748B", fontWeight: "700" }}>
-          BACK WALL
-        </div>
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "40px 52px",
+          backgroundColor: "#060709",
+          borderRadius: "8px",
+          border: `1px solid ${BORDER_COLOR}`,
+          boxSizing: "border-box",
+          minHeight: "480px",
+        }}>
+          <div
+            ref={containerRef}
+            style={{
+              position: "relative",
+              width: `${displayWidth}px`,
+              height: `${displayHeight}px`,
+              backgroundColor: "#0F131D",
+              border: `3px solid ${GOLD}`,
+              borderRadius: "4px",
+              overflow: "visible",
+              backgroundImage: `
+                linear-gradient(to right, rgba(255,255,255,0.06) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.06) 1px, transparent 1px)
+              `,
+              backgroundSize: `${12 * scale}px ${12 * scale}px`,
+              userSelect: "none",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.5)",
+            }}
+          >
+            {/* Wall Label Indicators */}
+            <div style={{ position: "absolute", top: -26, left: "50%", transform: "translateX(-50%)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px" }}>
+              BACK WALL ({roomWidthFt} ft)
+            </div>
+            <div style={{ position: "absolute", bottom: -26, left: "50%", transform: "translateX(-50%)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px" }}>
+              FRONT WALL
+            </div>
+            <div style={{ position: "absolute", left: -56, top: "50%", transform: "translateY(-50%) rotate(-90deg)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px", whiteSpace: "nowrap" }}>
+              LEFT WALL
+            </div>
+            <div style={{ position: "absolute", right: -58, top: "50%", transform: "translateY(-50%) rotate(90deg)", fontSize: "0.65rem", fontWeight: "700", color: GOLD, letterSpacing: "1px", whiteSpace: "nowrap" }}>
+              RIGHT WALL
+            </div>
 
-        {/* Render 2D Fixture Blocks */}
-        {Object.keys(itemsState).map((key) => {
-          const item = itemsState[key];
-          const isSelected = selectedItemKey === key;
-          const isCabinet = key === "cabinet";
-          const isMirror = key === "mirror";
+            {/* Wet Zone Overlay */}
+            {showWetDryZones && items.bathtub && (() => {
+              const wetLeftIn = Math.max(0, items.bathtub.x - 6);
+              const wetTopIn = Math.max(0, items.bathtub.y - 6);
+              const wetRightIn = Math.min(roomWidthIn, items.bathtub.x + items.bathtub.w + 12);
+              const wetBottomIn = Math.min(roomDepthIn, items.bathtub.y + items.bathtub.h + 12);
+              const wetWidthIn = Math.max(1, wetRightIn - wetLeftIn);
+              const wetHeightIn = Math.max(1, wetBottomIn - wetTopIn);
 
-          return (
-            <div
-              key={key}
-              onMouseDown={(e) => handleMouseDown(key, e)}
-              onClick={() => setSelectedItemKey(key)}
-              style={{
-                position: "absolute",
-                left: `${item.x * scale}px`,
-                top: `${item.y * scale}px`,
-                width: `${Math.max(10, item.w) * scale}px`,
-                height: `${Math.max(isMirror ? 3 : 10, item.h) * scale}px`,
-                backgroundColor: item.color,
-                color: "#FFFFFF",
-                borderRadius: isCabinet ? "2px" : (isMirror ? "1px" : "4px"),
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.6rem",
-                fontWeight: "700",
-                cursor: draggingItem === key ? "grabbing" : "grab",
-                boxShadow: isSelected ? "0 0 0 3px #D97E3A, 0 4px 12px rgba(0,0,0,0.5)" : "0 2px 6px rgba(0,0,0,0.3)",
-                transform: `rotate(${item.rot || 0}deg) ${draggingItem === key ? "scale(1.04)" : "scale(1)"}`,
-                transition: draggingItem === key ? "none" : "transform 0.2s ease, box-shadow 0.15s ease",
-                border: isSelected ? "2px solid #FFD166" : "1px solid rgba(255,255,255,0.4)",
-                zIndex: isSelected ? 10 : (isMirror ? 4 : (isCabinet ? 1 : 3)),
-                textAlign: "center",
-                padding: "2px",
-                boxSizing: "border-box",
-                opacity: isCabinet ? 0.85 : 1.0,
-              }}
-            >
-              {/* Front Edge Indicator Bar (Gold Accent along front facing edge) */}
-              {(key === "washbasin" || key === "toilet" || key === "bathtub") && (
+              return (
                 <div
                   style={{
                     position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: "3.5px",
-                    backgroundColor: "#FFD166",
-                    boxShadow: "0 0 8px rgba(255, 209, 102, 0.9)",
-                    borderRadius: "0 0 3px 3px",
+                    left: `${wetLeftIn * scale}px`,
+                    top: `${wetTopIn * scale}px`,
+                    width: `${wetWidthIn * scale}px`,
+                    height: `${wetHeightIn * scale}px`,
+                    backgroundColor: "rgba(14, 165, 233, 0.12)",
+                    border: "1.5px dashed rgba(14, 165, 233, 0.4)",
+                    borderRadius: "6px",
                     pointerEvents: "none",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "flex-end",
+                    padding: "4px",
+                    fontSize: "0.6rem",
+                    color: "#0EA5E9",
+                    fontWeight: "700",
                   }}
-                />
-              )}
+                >
+                  WET ZONE
+                </div>
+              );
+            })()}
 
-              {/* Counter-rotate text so labels remain perfectly upright and horizontal */}
-              <div
-                style={{
-                  transform: `rotate(${- (item.rot || 0)}deg)`,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  pointerEvents: "none",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                }}
-              >
-                <div>{item.label}</div>
-                {!isMirror && (
-                  <div style={{ fontSize: "0.55rem", opacity: 0.9, fontWeight: "400" }}>
-                    {Math.round(item.w)}" x {Math.round(item.h)}" {item.rot ? `(${item.rot}°)` : ""}
+            {/* Plumbing Lines */}
+            {showPlumbing && items.washbasin && items.toilet && (
+              <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 2 }}>
+                <line
+                  x1={(items.toilet.x + items.toilet.w / 2) * scale}
+                  y1={(items.toilet.y + items.toilet.h / 2) * scale}
+                  x2={(items.washbasin.x + items.washbasin.w / 2) * scale}
+                  y2={(items.washbasin.y + items.washbasin.h / 2) * scale}
+                  stroke="rgba(218, 157, 73, 0.3)"
+                  strokeWidth="2"
+                  strokeDasharray="4,4"
+                />
+              </svg>
+            )}
+
+            {/* Render 2D Fixture Blocks */}
+            {Object.keys(items).map((key) => {
+              const item = items[key];
+              const isSelected = selectedKey === key;
+              const isDoor = key === "door" || item.category === "door";
+              const isWindow = key === "window" || item.category === "window";
+              const isCabinet = key === "cabinet";
+
+              return (
+                <div key={key} style={{ position: "relative" }}>
+                  {showClearances && !isDoor && !isWindow && !isCabinet && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${(item.x - 8) * scale}px`,
+                        top: `${(item.y - 8) * scale}px`,
+                        width: `${(item.w + 16) * scale}px`,
+                        height: `${(item.h + 16) * scale}px`,
+                        border: "1px dashed rgba(245, 158, 11, 0.35)",
+                        borderRadius: "6px",
+                        pointerEvents: "none",
+                        zIndex: 1,
+                      }}
+                    />
+                  )}
+
+                  {isDoor && showClearances && (() => {
+                    const side = item.wallSnapSide || (
+                      item.y <= 10 ? "top" :
+                      item.y >= roomDepthIn - 15 ? "bottom" :
+                      item.x <= 10 ? "left" :
+                      item.x >= roomWidthIn - 15 ? "right" : "bottom"
+                    );
+
+                    let svgLeft = item.x * scale;
+                    let svgTop = (item.y - item.w) * scale;
+                    let svgW = item.w * scale;
+                    let svgH = item.w * scale;
+                    let pathD = `M 0 ${item.w * scale} A ${item.w * scale} ${item.w * scale} 0 0 1 ${item.w * scale} 0 L 0 ${item.w * scale} Z`;
+
+                    if (side === "top") {
+                      svgTop = (item.y + item.h) * scale;
+                      pathD = `M 0 0 A ${item.w * scale} ${item.w * scale} 0 0 0 ${item.w * scale} ${item.w * scale} L 0 0 Z`;
+                    } else if (side === "left") {
+                      svgLeft = (item.x + item.w) * scale;
+                      svgTop = item.y * scale;
+                      svgW = item.h * scale;
+                      svgH = item.h * scale;
+                      pathD = `M 0 0 A ${item.h * scale} ${item.h * scale} 0 0 1 ${item.h * scale} ${item.h * scale} L 0 0 Z`;
+                    } else if (side === "right") {
+                      svgLeft = (item.x - item.h) * scale;
+                      svgTop = item.y * scale;
+                      svgW = item.h * scale;
+                      svgH = item.h * scale;
+                      pathD = `M ${item.h * scale} 0 A ${item.h * scale} ${item.h * scale} 0 0 0 0 ${item.h * scale} L ${item.h * scale} 0 Z`;
+                    }
+
+                    return (
+                      <svg
+                        style={{
+                          position: "absolute",
+                          left: `${svgLeft}px`,
+                          top: `${svgTop}px`,
+                          width: `${svgW}px`,
+                          height: `${svgH}px`,
+                          pointerEvents: "none",
+                          zIndex: 2,
+                        }}
+                      >
+                        <path
+                          d={pathD}
+                          fill="rgba(245, 158, 11, 0.08)"
+                          stroke="#F59E0B"
+                          strokeWidth="1.5"
+                          strokeDasharray="3,3"
+                        />
+                      </svg>
+                    );
+                  })()}
+
+                  <div
+                    onMouseDown={(e) => handleMouseDown(key, e)}
+                    onClick={() => setSelectedKey(key)}
+                    style={{
+                      position: "absolute",
+                      left: `${item.x * scale}px`,
+                      top: `${item.y * scale}px`,
+                      width: `${Math.max(8, item.w) * scale}px`,
+                      height: `${Math.max(8, item.h) * scale}px`,
+                      backgroundColor: item.color,
+                      color: "#FFFFFF",
+                      borderRadius: isCabinet ? "2px" : (isDoor || isWindow ? "1px" : "6px"),
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "0.65rem",
+                      fontWeight: "700",
+                      cursor: draggingKey === key ? "grabbing" : "grab",
+                      boxShadow: isSelected ? `0 0 0 3px ${GOLD}, 0 6px 16px rgba(0,0,0,0.6)` : "0 3px 8px rgba(0,0,0,0.4)",
+                      transform: `rotate(${item.rot || 0}deg) ${draggingKey === key ? "scale(1.05)" : "scale(1)"}`,
+                      transition: draggingKey === key ? "none" : "transform 0.15s ease, box-shadow 0.15s ease",
+                      border: isSelected ? "2px solid #FFFFFF" : "1px solid rgba(255,255,255,0.3)",
+                      zIndex: isSelected ? 20 : (isCabinet ? 2 : 10),
+                      textAlign: "center",
+                      padding: "2px",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    {!isDoor && !isWindow && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: "4px",
+                          backgroundColor: GOLD,
+                          borderRadius: "0 0 4px 4px",
+                          pointerEvents: "none",
+                        }}
+                      />
+                    )}
+
+                    <div style={{ transform: `rotate(${- (item.rot || 0)}deg)`, pointerEvents: "none", whiteSpace: "nowrap" }}>
+                      <div>{item.label}</div>
+                      <div style={{ fontSize: "0.55rem", opacity: 0.85, fontWeight: "400" }}>
+                        {Math.round(item.w)}" × {Math.round(item.h)}"
+                      </div>
+                    </div>
                   </div>
-                )}
-                {(key === "washbasin" || key === "toilet" || key === "bathtub") && (
-                  <div style={{ fontSize: "0.5rem", color: "#FFD166", fontWeight: "800", marginTop: "1px" }}>
-                    FRONT ▼
-                  </div>
-                )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right Column: Controls Sidebar & Property Inspector */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          {/* Surface Themes Dropdowns Card */}
+          <div style={{ padding: "16px", backgroundColor: "#0B0E14", borderRadius: "8px", border: `1px solid ${BORDER_COLOR}` }}>
+
+            {/* Floor Surface Theme Dropdown */}
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", color: GOLD, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Floor Surface Theme
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#161B26", border: `1.5px solid ${BORDER_COLOR}`, borderRadius: "6px", padding: "4px 10px" }}>
+                <span style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: selectedFloorObj.color, border: `1px solid ${selectedFloorObj.border}`, flexShrink: 0 }} />
+                <select
+                  value={floorTheme}
+                  onChange={(e) => onFloorThemeChange?.(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "6px 0",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: "#FFFFFF",
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    outline: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  {FLOOR_THEMES.map((theme) => (
+                    <option key={theme.id} value={theme.id} style={{ backgroundColor: "#161B26", color: "#FFFFFF" }}>
+                      {theme.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Selected Element Controls (Dimensions & Rotation Button) */}
-      {selectedItem && (
-        <div style={{ backgroundColor: "#0F172A", padding: "12px", borderRadius: "6px", border: "1px solid #334155" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-            <span style={{ fontSize: "0.8rem", fontWeight: "700", color: "#FFD166" }}>
-              Adjust {selectedItem.label} Details:
-            </span>
-            {/* Rotation Button for selected 2D element */}
-            <button
-              type="button"
-              onClick={() => {
-                const nextRot = ((selectedItem.rot || 0) + 90) % 360;
-                handleDimensionChange(selectedItemKey, "rot", nextRot);
-              }}
-              style={{
-                backgroundColor: ORANGE,
-                color: WHITE,
-                border: "none",
-                borderRadius: "4px",
-                padding: "4px 10px",
-                fontSize: "0.75rem",
-                fontWeight: "700",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-            >
-              Rotate 90° ({selectedItem.rot || 0}°)
-            </button>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            {/* Wall Tile Theme Dropdown */}
             <div>
-              <label style={{ fontSize: "0.75rem", fontWeight: "600", color: "#CBD5E1" }}>
-                Width: {selectedItem.w}"
+              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", color: GOLD, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Wall Tile / Surface Theme
               </label>
-              <input
-                type="range"
-                min={selectedItem.minW}
-                max={selectedItem.maxW}
-                value={selectedItem.w}
-                onChange={(e) => handleDimensionChange(selectedItemKey, "w", e.target.value)}
-                style={{ width: "100%", accentColor: ORANGE }}
-              />
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", backgroundColor: "#161B26", border: `1.5px solid ${BORDER_COLOR}`, borderRadius: "6px", padding: "4px 10px" }}>
+                <span style={{ width: "16px", height: "16px", borderRadius: "3px", backgroundColor: selectedWallObj.color, border: `1px solid ${selectedWallObj.border}`, flexShrink: 0 }} />
+                <select
+                  value={wallTheme}
+                  onChange={(e) => onWallThemeChange?.(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "6px 0",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: "#FFFFFF",
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    outline: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  {WALL_THEMES.map((theme) => (
+                    <option key={theme.id} value={theme.id} style={{ backgroundColor: "#161B26", color: "#FFFFFF" }}>
+                      {theme.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label style={{ fontSize: "0.75rem", fontWeight: "600", color: "#CBD5E1" }}>
-                Depth / Height: {selectedItem.h}"
-              </label>
-              <input
-                type="range"
-                min={selectedItem.minH}
-                max={selectedItem.maxH}
-                value={selectedItem.h}
-                onChange={(e) => handleDimensionChange(selectedItemKey, "h", e.target.value)}
-                style={{ width: "100%", accentColor: ORANGE }}
-              />
-            </div>
           </div>
 
-          {selectedItemKey === "washbasin" && (
-            <div style={{ fontSize: "0.7rem", color: ORANGE, fontWeight: "600", marginTop: "6px" }}>
-              ✓ Cabinet margin auto-enforced at minimum 3 inches bigger on each side (Cabinet: {Math.max(selectedItem.w + 6, itemsState.cabinet.w)}" W x {Math.max(selectedItem.h + 6, itemsState.cabinet.h)}" D)
+          {/* Feature Toggles */}
+          <div style={{ padding: "14px 16px", backgroundColor: "#0B0E14", borderRadius: "8px", border: `1px solid ${BORDER_COLOR}`, display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.78rem", color: TEXT_MUTED }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={showWetDryZones}
+                onChange={(e) => setShowWetDryZones(e.target.checked)}
+                style={{ accentColor: GOLD }}
+              />
+              Wet & Dry Zone Overlays
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={showClearances}
+                onChange={(e) => setShowClearances(e.target.checked)}
+                style={{ accentColor: GOLD }}
+              />
+              Fixture Clearance Boundaries
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={showPlumbing}
+                onChange={(e) => setShowPlumbing(e.target.checked)}
+                style={{ accentColor: GOLD }}
+              />
+              Plumbing Drain Lines
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={snapToGrid}
+                onChange={(e) => setSnapToGrid(e.target.checked)}
+                style={{ accentColor: GOLD }}
+              />
+              Snap to Grid (6")
+            </label>
+          </div>
+
+          {/* Property Inspector Card (on the side, without Snapped to Wall badge) */}
+          {selectedItem && (
+            <div style={{ padding: "16px", backgroundColor: "#0B0E14", borderRadius: "8px", border: `1px solid ${BORDER_COLOR}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: selectedItem.color }} />
+                  <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "#F8FAFC" }}>
+                    {selectedItem.label}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextRot = ((selectedItem.rot || 0) + 90) % 360;
+                      handlePropChange(selectedKey, "rot", nextRot);
+                    }}
+                    style={{
+                      padding: "4px 8px",
+                      backgroundColor: GOLD,
+                      color: "#08090C",
+                      border: "none",
+                      borderRadius: "4px",
+                      fontSize: "0.7rem",
+                      fontWeight: "700",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Rotate 90° ({selectedItem.rot || 0}°)
+                  </button>
+
+                  {!["washbasin", "toilet", "door"].includes(selectedKey) && (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(selectedKey)}
+                      style={{
+                        padding: "4px 8px",
+                        backgroundColor: "rgba(239, 68, 68, 0.2)",
+                        color: "#EF4444",
+                        border: "1px solid #EF4444",
+                        borderRadius: "4px",
+                        fontSize: "0.7rem",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "2px" }}>
+                    Width (inches): {selectedItem.w}"
+                  </label>
+                  <input
+                    type="range"
+                    min={selectedItem.minW || 10}
+                    max={selectedItem.maxW || 80}
+                    value={selectedItem.w}
+                    onChange={(e) => handlePropChange(selectedKey, "w", e.target.value)}
+                    style={{ width: "100%", accentColor: GOLD }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "2px" }}>
+                    Depth / Length (inches): {selectedItem.h}"
+                  </label>
+                  <input
+                    type="range"
+                    min={selectedItem.minH || 10}
+                    max={selectedItem.maxH || 80}
+                    value={selectedItem.h}
+                    onChange={(e) => handlePropChange(selectedKey, "h", e.target.value)}
+                    style={{ width: "100%", accentColor: GOLD }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.75rem", color: TEXT_MUTED, marginBottom: "2px" }}>
+                    Height (inches): {selectedItem.heightIn || 30}"
+                  </label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="96"
+                    value={selectedItem.heightIn || 30}
+                    onChange={(e) => handlePropChange(selectedKey, "heightIn", e.target.value)}
+                    style={{ width: "100%", accentColor: GOLD }}
+                  />
+                </div>
+              </div>
             </div>
           )}
+
         </div>
-      )}
+
+      </div>
     </div>
   );
 }
+

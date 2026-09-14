@@ -1,6 +1,8 @@
-const DARK_ORANGE = "#B86A2A";
-const PEACH = "#E8B4A0";
-const WHITE = "#FFFFFF";
+const GOLD = "#FFFFFF";
+const DARK_BG = "#08090C";
+const DARK_CARD = "#10141D";
+const BORDER_COLOR = "#232D3F";
+const TEXT_MUTED = "#94A3B8";
 
 export default function BundleResult({ bundle }) {
   if (!bundle) return null;
@@ -11,28 +13,27 @@ export default function BundleResult({ bundle }) {
       gap: "12px",
     },
     card: {
-      backgroundColor: "#1C2541",
-      border: `1px solid #334155`,
-      borderRadius: "6px",
-      padding: "14px",
+      backgroundColor: DARK_BG,
+      border: `1px solid ${BORDER_COLOR}`,
+      borderRadius: "8px",
+      padding: "16px",
       transition: "all 0.2s ease",
-      cursor: "pointer",
     },
     cardHover: {
-      borderColor: "#D97E3A",
+      borderColor: GOLD,
       boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
     },
     category: {
       fontSize: "0.75rem",
       fontWeight: "700",
-      color: "#FFD166",
+      color: GOLD,
       marginBottom: "4px",
       textTransform: "uppercase",
       letterSpacing: "0.5px",
     },
     modelName: {
-      fontSize: "0.95rem",
-      fontWeight: "600",
+      fontSize: "1rem",
+      fontWeight: "700",
       color: "#F8FAFC",
       marginBottom: "6px",
     },
@@ -44,21 +45,22 @@ export default function BundleResult({ bundle }) {
     },
     priceContainer: {
       marginTop: "16px",
-      padding: "14px",
-      backgroundColor: "#0F172A",
-      border: "1px solid #334155",
-      borderRadius: "6px",
+      padding: "16px",
+      backgroundColor: DARK_BG,
+      border: `1px dashed ${GOLD}`,
+      borderRadius: "8px",
       textAlign: "center",
     },
     priceLabel: {
       fontSize: "0.8rem",
-      color: "#FFD166",
-      fontWeight: "700",
+      color: TEXT_MUTED,
+      fontWeight: "600",
+      textTransform: "uppercase",
     },
     priceValue: {
-      fontSize: "1.25rem",
-      fontWeight: "700",
-      color: "#D97E3A",
+      fontSize: "1.35rem",
+      fontWeight: "800",
+      color: GOLD,
       marginTop: "4px",
     },
   };
@@ -78,7 +80,7 @@ export default function BundleResult({ bundle }) {
         </div>
       ))}
       <div style={styles.priceContainer}>
-        <div style={styles.priceLabel}>Total Budget</div>
+        <div style={styles.priceLabel}>Estimated Total Price</div>
         <div style={styles.priceValue}>₹ {bundle.total_price_inr?.toLocaleString('en-IN')}</div>
       </div>
     </div>
