@@ -1,9 +1,10 @@
 import React, { useState, useEffect, Component, useRef, useMemo } from "react";
-import LayoutPlanner2D from "./components/LayoutPlanner2D";
+import LayoutPlanner2D, { autoArrangeLayout } from "./components/LayoutPlanner2D";
 import CatalogBrowser from "./components/CatalogBrowser";
 import LayoutViewer3D from "./components/LayoutViewer3D";
 import BundleResult from "./components/BundleResult";
 import { createDesign, getProducts } from "./api/client";
+import { FALLBACK_CATALOGUE } from "./fallbackCatalogue";
 
 const GOLD = "#FFFFFF";
 const DARK_BG = "#08090C";
@@ -208,15 +209,17 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
 }
 
 export default function App() {
-  // Room Specification & Design Parameters State (Default budget = 0)
+  // Room Specification & Design Parameters State (Default budget = "")
   const [roomWidthFt, setRoomWidthFt] = useState(8);
   const [roomDepthFt, setRoomDepthFt] = useState(6);
   const [roomHeightFt, setRoomHeightFt] = useState(9);
-  const [budgetInr, setBudgetInr] = useState(0);
+  const [budgetInr, setBudgetInr] = useState("");
   const [aestheticTheme, setAestheticTheme] = useState("Minimalist Modern");
   const [floorTheme, setFloorTheme] = useState("marble");
   const [wallTheme, setWallTheme] = useState("subway");
+  const [bathSectionMode, setBathSectionMode] = useState("shower");
   const [cohesionScore, setCohesionScore] = useState(0.8);
+  const [generationKey, setGenerationKey] = useState(0);
 
   // Floating Overlay States over 3D Scene Background
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
@@ -235,32 +238,75 @@ export default function App() {
   // Fetch all products on mount for instant in-3D cycling
   useEffect(() => {
     getProducts()
-      .then((data) => setAllProducts(data))
-      .catch((err) => console.error("Error fetching all products:", err));
+      .then((data) => {
+        if (data && data.length > 0) setAllProducts(data);
+        else setAllProducts(FALLBACK_CATALOGUE);
+      })
+      .catch((err) => {
+        console.warn("Using fallback products in App:", err);
+        setAllProducts(FALLBACK_CATALOGUE);
+      });
   }, []);
 
   // Compute live active layout array for 3D background in real-time
   const activeLayoutData = useMemo(() => {
-    const baseLayout = generateFallbackLayout(roomWidthFt, roomDepthFt, itemsState);
+    let baseLayout = generateFallbackLayout(roomWidthFt, roomDepthFt, itemsState);
+
+    // If bathSectionMode is 'bathtub' and itemsState doesn't have a bathtub entry, add default bathtub area
+    if (bathSectionMode === "bathtub" && !baseLayout.some(p => p.category === "bathtub" || p.category === "bath_tub")) {
+      baseLayout.push({
+        sku_code: "bathtub_area",
+        category: "bathtub",
+        model_name: "Reach Drop-In Bath",
+        x: 4,
+        y: 4,
+        width_in: 50,
+        depth_in: 28,
+        height_in: 18,
+        rotation_deg: 0,
+        is_placeholder: true,
+      });
+    }
+
+    const pool = (allProducts && allProducts.length > 0) ? allProducts : FALLBACK_CATALOGUE;
+    const defaultBathtubProd = pool.find(p => (p.category || "").toLowerCase().includes("bath")) || {
+      sku_code: "15848T",
+      category: "bath_tub",
+      subcategory: "drop_in",
+      model_name: "Reach Drop-In Bath",
+      price_inr: 34000,
+      width_in: 67,
+      depth_in: 27.5,
+      height_in: 17.5,
+      colour: "white",
+    };
 
     return baseLayout.map((placement) => {
       const pCat = placement.category;
-      const customProd = selectedProductsMap[pCat] || selectedProductsMap[pCat === "wash_basin" ? "washbasin" : pCat];
+      let customProd = selectedProductsMap[pCat] || selectedProductsMap[pCat === "wash_basin" ? "washbasin" : pCat] || selectedProductsMap[pCat === "bath_tub" ? "bathtub" : pCat];
+
+      if (!customProd && bathSectionMode === "bathtub" && (pCat === "bathtub" || pCat === "bath_tub")) {
+        customProd = defaultBathtubProd;
+      }
+
       if (customProd) {
         return {
           ...placement,
           sku_code: customProd.sku_code,
           model_name: customProd.model_name,
           price_inr: customProd.price_inr,
+          subcategory: customProd.subcategory,
+          colour: customProd.colour,
           has_3d_model: customProd.has_3d_model,
           obj_file_path: customProd.obj_file_path,
           width_in: customProd.width_in || placement.width_in,
           depth_in: customProd.depth_in || placement.depth_in,
+          height_in: customProd.height_in || placement.height_in,
         };
       }
       return placement;
     });
-  }, [roomWidthFt, roomDepthFt, itemsState, selectedProductsMap]);
+  }, [roomWidthFt, roomDepthFt, itemsState, selectedProductsMap, bathSectionMode, allProducts]);
 
   const DEFAULT_PRODUCTS = [
     {
@@ -329,6 +375,11 @@ export default function App() {
     const nextMap = { ...selectedProductsMap, [product.category]: product, [normCat]: product };
     setSelectedProductsMap(nextMap);
     setSelectedProductDetails(product);
+  };
+
+  const handleReloadGeneration = () => {
+    setGenerationKey((prev) => prev + 1);
+    setIsPlannerOpen(false);
   };
 
   return (
@@ -427,8 +478,27 @@ export default function App() {
           </button>
         </div>
 
-        {/* Action Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        {/* Action Buttons */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <button
+            type="button"
+            onClick={handleReloadGeneration}
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#000000",
+              border: "1px solid #000000",
+              color: "#FFFFFF",
+              borderRadius: "6px",
+              fontSize: "0.85rem",
+              fontWeight: "700",
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+              transition: "all 0.2s ease",
+            }}
+          >
+            Reload Generation
+          </button>
+
           <button
             type="button"
             onClick={() => setItemsState(null)}
@@ -470,6 +540,7 @@ export default function App() {
             {/* 3D Scene Background Rendering Live Active Layout */}
             <ErrorBoundary>
               <LayoutViewer3D
+                key={generationKey}
                 layoutData={activeLayoutData}
                 roomWidth={roomWidthFt}
                 roomDepth={roomDepthFt}
@@ -477,6 +548,8 @@ export default function App() {
                 aestheticTheme={aestheticTheme}
                 floorTheme={floorTheme}
                 wallTheme={wallTheme}
+                bathSectionMode={bathSectionMode}
+                budgetInr={budgetInr}
                 onProductClick={setSelectedProductDetails}
                 onCycleProduct={handleCycleProduct}
                 hideHotspots={isPlannerOpen || isCatalogueOpen}
@@ -539,9 +612,12 @@ export default function App() {
                     wallTheme={wallTheme}
                     onFloorThemeChange={setFloorTheme}
                     onWallThemeChange={setWallTheme}
+                    bathSectionMode={bathSectionMode}
+                    setBathSectionMode={setBathSectionMode}
                     itemsState={itemsState}
                     onItemsStateChange={setItemsState}
                     onReset={() => setItemsState(null)}
+                    onReloadGeneration={handleReloadGeneration}
                   />
                 </div>
               </div>

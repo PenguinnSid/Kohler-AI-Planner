@@ -19,5 +19,6 @@ class Product(Base):
     depth_in = Column(Float, nullable=True)
     
     # 3D model tracking
+    colour = Column(String, nullable=True)
     has_3d_model = Column(Boolean, default=False)
     obj_file_path = Column(String, nullable=True)  # Path to OBJ file relative to backend
