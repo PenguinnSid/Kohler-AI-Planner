@@ -48,8 +48,8 @@ function Product3DMesh({ product }) {
           url,
           (object) => {
             if (!active || !object) return;
-            const isFaucet = (category === "faucet") || (sku_code && (sku_code.includes("72275") || sku_code.includes("25759") || sku_code.includes("27489")));
-            if (sku_code.includes("20704") || isFaucet) {
+            const isAleo72275 = sku_code && sku_code.includes("72275");
+            if (sku_code.includes("20704") || isAleo72275) {
               object.rotation.set(0, 0, 0);
             } else {
               object.rotation.x = -Math.PI / 2;

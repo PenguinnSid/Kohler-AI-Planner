@@ -350,7 +350,8 @@ function BathroomDoor({ doorPlacement, roomWidth, roomDepth }) {
 // Faucet Fixture: Base-Mount vs Wall-Mount positioning aligned with sink & mirror center
 function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClick, onCycleProduct, hideHotspots, roomWidth, roomDepth }) {
   const fPlacement = faucetPlacement || { sku_code: "23475T-4", category: "faucet", subcategory: "base-mount", model_name: "Parallel Modern Faucet", price_inr: 28000, width_in: 4, depth_in: 6.5, height_in: 8.5 };
-  const isWallMount = (fPlacement.subcategory || fPlacement.model_name || "").toLowerCase().includes("wall-mount") || (fPlacement.category || "").includes("wall");
+  const subcat = (fPlacement.subcategory || fPlacement.model_name || fPlacement.category || "").toLowerCase();
+  const isWallMount = subcat.includes("wall-mount") || subcat.includes("wall_mount") || subcat.includes("wall") || (fPlacement.sku_code && (fPlacement.sku_code.includes("25759") || fPlacement.sku_code.includes("27489")));
   const matProps = getProductMaterialProps(fPlacement);
 
   const [objModel, setObjModel] = useState(null);
@@ -410,8 +411,12 @@ function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClic
         `${BASE_URL}/api/3d/${sku_code}.obj`,
         (object) => {
           if (!active || !object) return;
-          // Upright faucet models are natively Y-up! Setting rotation to (0,0,0) keeps them standing vertically upright
-          object.rotation.set(0, 0, 0);
+          const isNativelyUprightY = sku_code && (sku_code.includes("72275") || sku_code.includes("20704"));
+          if (isNativelyUprightY) {
+            object.rotation.set(0, 0, 0);
+          } else {
+            object.rotation.x = -Math.PI / 2;
+          }
           object.updateMatrixWorld(true);
 
           let box = new THREE.Box3().setFromObject(object);
@@ -424,7 +429,7 @@ function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClic
 
           object.position.x = -center.x * scale;
           object.position.y = -box.min.y * scale;
-          object.position.z = -center.z * scale;
+          object.position.z = isWallMount ? -box.min.z * scale : -center.z * scale;
           object.scale.set(scale, scale, scale);
 
           object.traverse((child) => {
@@ -459,23 +464,25 @@ function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClic
   };
 
   return (
-    <group position={[posX, platformOffset, posZ]} rotation={[0, rotY, 0]} onClick={handleFaucetClick}>
-      {/* Architectural Faucet Mounting Platform Deck Block resting directly behind sink bowl */}
-      <group position={[0, deckH / 2, 0]}>
-        {/* Main Platform Body */}
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[deckW, deckH, deckD]} />
-          <meshStandardMaterial color="#1E293B" roughness={0.3} metalness={0.6} />
-        </mesh>
-        {/* Top Deck Surface Marble Ledge Slab */}
-        <mesh position={[0, deckH / 2 + 0.2, 0]} receiveShadow>
-          <boxGeometry args={[deckW + 0.8, 0.4, deckD + 0.8]} />
-          <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.2} />
-        </mesh>
-      </group>
+    <group position={[posX, isWallMount ? (platformOffset + basinHeight + 7) : platformOffset, posZ]} rotation={[0, rotY, 0]} onClick={handleFaucetClick}>
+      {!isWallMount && (
+        /* Architectural Faucet Mounting Platform Deck Block resting directly behind sink bowl for Base-Mount faucets */
+        <group position={[0, deckH / 2, 0]}>
+          {/* Main Platform Body */}
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[deckW, deckH, deckD]} />
+            <meshStandardMaterial color="#1E293B" roughness={0.3} metalness={0.6} />
+          </mesh>
+          {/* Top Deck Surface Marble Ledge Slab */}
+          <mesh position={[0, deckH / 2 + 0.2, 0]} receiveShadow>
+            <boxGeometry args={[deckW + 0.8, 0.4, deckD + 0.8]} />
+            <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.2} />
+          </mesh>
+        </group>
+      )}
 
-      {/* Faucet Model sitting on top of the platform deck */}
-      <group position={[0, isWallMount ? (deckH + 7) : (deckH + 0.4), 0]}>
+      {/* Faucet Model sitting on top of platform deck for Base-Mount, or directly on wall for Wall-Mount */}
+      <group position={[0, isWallMount ? 0 : (deckH + 0.4), 0]}>
         {objModel ? (
           <primitive object={objModel} />
         ) : isWallMount ? (
@@ -519,7 +526,7 @@ function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClic
 
       {!hideHotspots && (
         <OrangeHotspotStub
-          position={[0, isWallMount ? deckH + 15 : deckH + 10, 0]}
+          position={[0, isWallMount ? 10 : (deckH + 10), 0]}
           placement={fPlacement}
           isSelected={isSelected}
           onClick={() => onClick(fPlacement)}
@@ -1324,9 +1331,9 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
           if (!isSubscribed || !object) return;
 
           const isVeil20704 = sku_code && sku_code.includes("20704");
-          const isFaucet = catLower === "faucet" || (sku_code && (sku_code.includes("72275") || sku_code.includes("25759") || sku_code.includes("27489")));
+          const isAleo72275 = sku_code && sku_code.includes("72275");
 
-          if (isVeil20704 || isFaucet) {
+          if (isVeil20704 || isAleo72275) {
             object.rotation.set(0, 0, 0);
           } else {
             object.rotation.x = -Math.PI / 2;
