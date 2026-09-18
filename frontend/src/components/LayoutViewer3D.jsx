@@ -19,10 +19,10 @@ export function getProductMaterialProps(placement) {
     return { color: "#18181B", roughness: 0.45, metalness: 0.1 };
   }
   if (colorStr.includes("brushed_bronze") || colorStr.includes("bronze")) {
-    return { color: "#A76D38", roughness: 0.25, metalness: 0.85 };
+    return { color: "#D4AB73", roughness: 0.2, metalness: 0.8 };
   }
   if (colorStr.includes("gold")) {
-    return { color: "#E2B04E", roughness: 0.2, metalness: 0.9 };
+    return { color: "#F5D061", roughness: 0.15, metalness: 0.85 };
   }
   if (colorStr.includes("polished_chrome") || colorStr.includes("chrome")) {
     return { color: "#E2E8F0", roughness: 0.08, metalness: 0.95 };
@@ -152,67 +152,91 @@ function Floor({ width, depth, floorTheme }) {
 
 // Dynamic 3D Vanity Mirror component (moves and auto-aligns to any wall based on 2D placement)
 function VanityMirror({ washbasinPlacement, cabinetPlacement, mirrorPlacement, windowPlacement, roomWidth, roomDepth }) {
-  const targetObj = mirrorPlacement || cabinetPlacement || washbasinPlacement;
+  const targetObj = washbasinPlacement || cabinetPlacement || mirrorPlacement;
   if (!targetObj) return null;
 
   const targetX = targetObj.x || 0;
   const targetY = targetObj.y || 0;
-  const targetW = targetObj.width_in || targetObj.w || 26;
-  const targetH = targetObj.depth_in || targetObj.h || 3;
-
-  let mirrorWidth = Math.max(14, targetW);
-  const mirrorHeight = Math.max(20, mirrorWidth * 0.9);
-  const mirrorY = 36 + mirrorHeight / 2;
-
-  let posX = targetX + targetW / 2;
-  let posZ = 0.4;
-  let rotY = 0;
+  const targetW = targetObj.width_in || targetObj.w || 22;
+  const targetH = targetObj.depth_in || targetObj.h || 18;
 
   const rotDeg = targetObj.rotation_deg || targetObj.rot || 0;
   const wallSnapSide = targetObj.wallSnapSide;
+
+  // Mirror center is ALWAYS locked directly behind/above the washbasin!
+  const centerX = targetX + targetW / 2;
+  const centerZ = targetY + targetH / 2;
+
+  let mirrorWidth = Math.max(16, mirrorPlacement?.width_in || mirrorPlacement?.w || Math.min(26, targetW + 4));
 
   const distTop = targetY;
   const distBottom = roomDepth - (targetY + targetH);
   const distLeft = targetX;
   const distRight = roomWidth - (targetX + targetW);
-
   const minDist = Math.min(distTop, distBottom, distLeft, distRight);
 
+  let posX = centerX;
+  let posZ = 0.4;
+  let rotY = 0;
+  let currentSide = "top";
+
   if (wallSnapSide === "bottom" || rotDeg === 180 || (!wallSnapSide && minDist === distBottom && distBottom < 20)) {
-    posX = targetX + targetW / 2;
+    currentSide = "bottom";
+    posX = centerX;
     posZ = roomDepth - 0.4;
     rotY = Math.PI;
   } else if (wallSnapSide === "left" || rotDeg === 90 || (!wallSnapSide && minDist === distLeft && distLeft < 20)) {
+    currentSide = "left";
     posX = 0.4;
-    posZ = targetY + targetH / 2;
+    posZ = centerZ;
     rotY = Math.PI / 2;
   } else if (wallSnapSide === "right" || rotDeg === 270 || (!wallSnapSide && minDist === distRight && distRight < 20)) {
+    currentSide = "right";
     posX = roomWidth - 0.4;
-    posZ = targetY + targetH / 2;
+    posZ = centerZ;
     rotY = -Math.PI / 2;
   } else {
-    // Back wall default
-    posX = targetX + targetW / 2;
+    currentSide = "top";
+    posX = centerX;
     posZ = 0.4;
     rotY = 0;
+  }
 
-    // Check window intersection on back wall
-    if (windowPlacement) {
-      const winW = windowPlacement.width_in || windowPlacement.w || 32;
-      const winX = windowPlacement.x ?? Math.max(0, roomWidth / 2 - winW / 2);
-      const winRight = winX + winW;
-      const mirLeft = posX - mirrorWidth / 2;
-      const mirRight = posX + mirrorWidth / 2;
+  // Prevent window casing intersection while keeping mirror 100% centered behind sink
+  if (windowPlacement) {
+    const winW = windowPlacement.width_in || windowPlacement.w || 32;
+    const winRot = windowPlacement.rotation_deg || windowPlacement.rot || 0;
+    const winSide = windowPlacement.wallSnapSide || (winRot === 180 ? "bottom" : winRot === 90 ? "left" : winRot === 270 ? "right" : "top");
 
-      if (mirLeft < winRight && mirRight > winX) {
-        const newLeft = winRight + 1;
-        if (newLeft + mirrorWidth > roomWidth) {
-          mirrorWidth = Math.max(14, roomWidth - newLeft - 1);
+    if (winSide === currentSide) {
+      if (currentSide === "top" || currentSide === "bottom") {
+        const winX = windowPlacement.x ?? (roomWidth / 2 - winW / 2);
+        const winLeft = winX;
+        const winRight = winX + winW;
+
+        const mirLeft = posX - mirrorWidth / 2;
+        const mirRight = posX + mirrorWidth / 2;
+
+        if (mirLeft < winRight + 2 && mirRight > winLeft - 2) {
+          let maxHalfWidth = Infinity;
+          if (posX > winRight) {
+            maxHalfWidth = posX - (winRight + 2);
+          } else if (posX < winLeft) {
+            maxHalfWidth = (winLeft - 2) - posX;
+          } else {
+            maxHalfWidth = Math.min(Math.abs(posX - winLeft), Math.abs(winRight - posX)) - 1;
+          }
+          const safeW = Math.max(12, Math.floor(maxHalfWidth * 2));
+          if (safeW < mirrorWidth) {
+            mirrorWidth = safeW;
+          }
         }
-        posX = newLeft + mirrorWidth / 2;
       }
     }
   }
+
+  const mirrorHeight = Math.max(18, mirrorWidth * 0.95);
+  const mirrorY = 36 + mirrorHeight / 2;
 
   return (
     <group position={[posX, mirrorY, posZ]} rotation={[0, rotY, 0]}>
@@ -324,81 +348,185 @@ function BathroomDoor({ doorPlacement, roomWidth, roomDepth }) {
 }
 
 // Faucet Fixture: Base-Mount vs Wall-Mount positioning aligned with sink & mirror center
-function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClick, onCycleProduct, hideHotspots }) {
+function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClick, onCycleProduct, hideHotspots, roomWidth, roomDepth }) {
   const fPlacement = faucetPlacement || { sku_code: "23475T-4", category: "faucet", subcategory: "base-mount", model_name: "Parallel Modern Faucet", price_inr: 28000, width_in: 4, depth_in: 6.5, height_in: 8.5 };
-  const isWallMount = (fPlacement.subcategory || fPlacement.model_name || "").toLowerCase().includes("wall-mount") || (fPlacement.category || "").includes("wall");
+  const subcat = (fPlacement.subcategory || fPlacement.model_name || fPlacement.category || "").toLowerCase();
+  const isWallMount = subcat.includes("wall-mount") || subcat.includes("wall_mount") || subcat.includes("wall") || (fPlacement.sku_code && (fPlacement.sku_code.includes("25759") || fPlacement.sku_code.includes("27489")));
   const matProps = getProductMaterialProps(fPlacement);
+
+  const [objModel, setObjModel] = useState(null);
+  const { sku_code, obj_file_path, has_3d_model } = fPlacement;
 
   const wbX = washbasinPlacement?.x ?? 64;
   const wbY = washbasinPlacement?.y ?? 6;
   const wbW = washbasinPlacement?.width_in ?? 22;
+  const wbD = washbasinPlacement?.depth_in ?? 18;
   const platformOffset = washbasinPlacement?.platform_height_offset ?? 12;
-  const basinHeight = 6;
+  const basinHeight = 5.5;
 
-  const centerX = wbX + wbW / 2;
+  const rotDeg = washbasinPlacement?.rotation_deg || washbasinPlacement?.rot || 0;
+  const wallSnapSide = washbasinPlacement?.wallSnapSide;
 
-  if (isWallMount) {
-    // Wall-mount faucet: mounted centrally on wall directly above washbasin bowl
-    const posZ = 0.6;
-    const posY = platformOffset + basinHeight + 7; // Elevated 7 inches above basin rim to prevent collision
+  const rW = roomWidth || 96;
+  const rD = roomDepth || 72;
 
-    return (
-      <group position={[centerX, posY, posZ]}>
-        {/* Wall Trim Escutcheon Plate */}
-        <mesh castShadow receiveShadow position={[0, 0, 0]}>
-          <boxGeometry args={[7, 4, 0.4]} />
-          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
-        </mesh>
-        {/* Wall Spout Extrusion pointing forward into sink */}
-        <mesh castShadow receiveShadow position={[0, -0.5, 3]}>
-          <boxGeometry args={[1.5, 1.2, 5.5]} />
-          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
-        </mesh>
-        {/* Single Lever Handle Control */}
-        <mesh castShadow receiveShadow position={[2.2, 0.5, 1.5]}>
-          <boxGeometry args={[1.2, 3, 1]} />
-          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
-        </mesh>
+  const distTop = wbY;
+  const distBottom = rD - (wbY + wbD);
+  const distLeft = wbX;
+  const distRight = rW - (wbX + wbW);
+  const minDist = Math.min(distTop, distBottom, distLeft, distRight);
 
-        {!hideHotspots && (
-          <OrangeHotspotStub
-            position={[0, 6, 2]}
-            placement={fPlacement}
-            isSelected={isSelected}
-            onClick={() => onClick(fPlacement)}
-            onCycleProduct={onCycleProduct}
-            hideHotspots={hideHotspots}
-          />
-        )}
-      </group>
-    );
+  let posX = wbX + wbW / 2;
+  let posZ = Math.max(1.8, wbY - 2.2);
+  let rotY = 0;
+
+  if (wallSnapSide === "bottom" || rotDeg === 180 || (!wallSnapSide && minDist === distBottom && distBottom < 20)) {
+    posX = wbX + wbW / 2;
+    posZ = isWallMount ? (rD - 0.6) : (rD - Math.max(1.8, (rD - (wbY + wbD)) - 2.2));
+    rotY = Math.PI;
+  } else if (wallSnapSide === "left" || rotDeg === 90 || (!wallSnapSide && minDist === distLeft && distLeft < 20)) {
+    posX = isWallMount ? 0.6 : Math.max(1.8, wbX - 2.2);
+    posZ = wbY + wbD / 2;
+    rotY = Math.PI / 2;
+  } else if (wallSnapSide === "right" || rotDeg === 270 || (!wallSnapSide && minDist === distRight && distRight < 20)) {
+    posX = isWallMount ? (rW - 0.6) : (rW - Math.max(1.8, (rW - (wbX + wbW)) - 2.2));
+    posZ = wbY + wbD / 2;
+    rotY = -Math.PI / 2;
+  } else {
+    // Back wall default
+    posX = wbX + wbW / 2;
+    posZ = isWallMount ? 0.6 : Math.max(1.8, wbY - 2.2);
+    rotY = 0;
   }
 
-  // Base-mount faucet: positioned centrally on deck/platform behind washbasin bowl
-  const posZ = Math.max(2, wbY - 2.5);
-  const posY = platformOffset + basinHeight + 4;
+  const deckW = Math.max(10, Math.min(14, wbW * 0.65));
+  const deckD = 5.5;
+  const deckH = basinHeight;
+
+  useEffect(() => {
+    let active = true;
+    if (has_3d_model && sku_code && obj_file_path) {
+      const loader = new OBJLoader();
+      loader.load(
+        `${BASE_URL}/api/3d/${sku_code}.obj`,
+        (object) => {
+          if (!active || !object) return;
+          const isNativelyUprightY = sku_code && (sku_code.includes("72275") || sku_code.includes("20704"));
+          if (isNativelyUprightY) {
+            object.rotation.set(0, 0, 0);
+          } else {
+            object.rotation.x = -Math.PI / 2;
+          }
+          object.updateMatrixWorld(true);
+
+          let box = new THREE.Box3().setFromObject(object);
+          let size = box.getSize(new THREE.Vector3());
+          if (!size || size.x <= 0 || size.z <= 0) return;
+
+          const targetH = isWallMount ? 6 : 8.5;
+          const scale = targetH / (size.y || 1);
+          const center = box.getCenter(new THREE.Vector3());
+
+          object.position.x = -center.x * scale;
+          object.position.y = -box.min.y * scale;
+          object.position.z = isWallMount ? -box.min.z * scale : -center.z * scale;
+          object.scale.set(scale, scale, scale);
+
+          object.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              child.material = new THREE.MeshStandardMaterial({
+                color: matProps.color,
+                roughness: matProps.roughness,
+                metalness: matProps.metalness,
+                side: THREE.DoubleSide,
+              });
+            }
+          });
+
+          const group = new THREE.Group();
+          group.add(object);
+          if (active) setObjModel(group);
+        },
+        undefined,
+        () => setObjModel(null)
+      );
+    } else {
+      setObjModel(null);
+    }
+    return () => { active = false; };
+  }, [sku_code, has_3d_model, obj_file_path, isWallMount, matProps.color, matProps.roughness, matProps.metalness]);
+
+  const handleFaucetClick = (e) => {
+    e.stopPropagation();
+    onClick?.(fPlacement);
+  };
 
   return (
-    <group position={[centerX, posY, posZ]}>
-      {/* Faucet Base Column */}
-      <mesh castShadow receiveShadow position={[0, 0, 0]}>
-        <cylinderGeometry args={[1.2, 1.4, 8, 16]} />
-        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
-      </mesh>
-      {/* Arching Spout facing forward */}
-      <mesh castShadow receiveShadow position={[0, 4.5, 2]}>
-        <boxGeometry args={[1.4, 1.5, 5]} />
-        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
-      </mesh>
-      {/* Single Handle Lever */}
-      <mesh castShadow receiveShadow position={[0, 5, -0.5]} rotation={[0.2, 0, 0]}>
-        <boxGeometry args={[1.2, 3, 0.8]} />
-        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
-      </mesh>
+    <group position={[posX, isWallMount ? (platformOffset + basinHeight + 7) : platformOffset, posZ]} rotation={[0, rotY, 0]} onClick={handleFaucetClick}>
+      {!isWallMount && (
+        /* Architectural Faucet Mounting Platform Deck Block resting directly behind sink bowl for Base-Mount faucets */
+        <group position={[0, deckH / 2, 0]}>
+          {/* Main Platform Body */}
+          <mesh castShadow receiveShadow>
+            <boxGeometry args={[deckW, deckH, deckD]} />
+            <meshStandardMaterial color="#1E293B" roughness={0.3} metalness={0.6} />
+          </mesh>
+          {/* Top Deck Surface Marble Ledge Slab */}
+          <mesh position={[0, deckH / 2 + 0.2, 0]} receiveShadow>
+            <boxGeometry args={[deckW + 0.8, 0.4, deckD + 0.8]} />
+            <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.2} />
+          </mesh>
+        </group>
+      )}
+
+      {/* Faucet Model sitting on top of platform deck for Base-Mount, or directly on wall for Wall-Mount */}
+      <group position={[0, isWallMount ? 0 : (deckH + 0.4), 0]}>
+        {objModel ? (
+          <primitive object={objModel} />
+        ) : isWallMount ? (
+          <>
+            {/* Wall Trim Escutcheon Plate */}
+            <mesh castShadow receiveShadow position={[0, 0, 0]}>
+              <boxGeometry args={[7, 4, 0.4]} />
+              <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+            </mesh>
+            {/* Wall Spout Extrusion pointing forward into sink */}
+            <mesh castShadow receiveShadow position={[0, -0.5, 3]}>
+              <boxGeometry args={[1.5, 1.2, 5.5]} />
+              <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+            </mesh>
+            {/* Single Lever Handle Control */}
+            <mesh castShadow receiveShadow position={[2.2, 0.5, 1.5]}>
+              <boxGeometry args={[1.2, 3, 1]} />
+              <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+            </mesh>
+          </>
+        ) : (
+          <>
+            {/* Faucet Base Column */}
+            <mesh castShadow receiveShadow position={[0, 4, 0]}>
+              <cylinderGeometry args={[1.2, 1.4, 8, 16]} />
+              <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+            </mesh>
+            {/* Arching Spout facing forward */}
+            <mesh castShadow receiveShadow position={[0, 7.5, 2]}>
+              <boxGeometry args={[1.4, 1.5, 5]} />
+              <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+            </mesh>
+            {/* Single Handle Lever */}
+            <mesh castShadow receiveShadow position={[0, 8, -0.5]} rotation={[0.2, 0, 0]}>
+              <boxGeometry args={[1.2, 3, 0.8]} />
+              <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+            </mesh>
+          </>
+        )}
+      </group>
 
       {!hideHotspots && (
         <OrangeHotspotStub
-          position={[0, 10, 0]}
+          position={[0, isWallMount ? 10 : (deckH + 10), 0]}
           placement={fPlacement}
           isSelected={isSelected}
           onClick={() => onClick(fPlacement)}
@@ -410,21 +538,142 @@ function FaucetFixture({ faucetPlacement, washbasinPlacement, isSelected, onClic
   );
 }
 
-// Bathtub Fixture: Freestanding vs Drop-In Platform
+// Architectural Concealed Carrier Wall Box for Wall-Hung Toilets (with Kohler Dual-Flush Actuator Plate)
+function ToiletCarrierWallBox({ placement, roomWidth, roomDepth }) {
+  if (!placement || (placement.category || "").toLowerCase() !== "toilet") return null;
+
+  const wIn = Number(placement.width_in) || 16;
+  const dIn = Number(placement.depth_in) || 24;
+  const rotDeg = placement.rotation_deg || 0;
+
+  const boxW = Math.max(22, wIn + 6);
+  const boxDepth = 6;
+  const boxH = 42;
+
+  let boxPosX = placement.x + wIn / 2;
+  let boxPosZ = placement.y + dIn / 2;
+  const rotY = (rotDeg * Math.PI) / 180;
+
+  if (rotDeg === 90) {
+    boxPosX = boxDepth / 2;
+    boxPosZ = placement.y + wIn / 2;
+  } else if (rotDeg === 270) {
+    boxPosX = roomWidth - boxDepth / 2;
+    boxPosZ = placement.y + wIn / 2;
+  } else if (rotDeg === 180) {
+    boxPosX = placement.x + wIn / 2;
+    boxPosZ = roomDepth - boxDepth / 2;
+  } else {
+    boxPosX = placement.x + wIn / 2;
+    boxPosZ = boxDepth / 2;
+  }
+
+  return (
+    <group position={[boxPosX, boxH / 2, boxPosZ]} rotation={[0, rotY, 0]}>
+      {/* Tiled Architectural Duct Wall Box */}
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[boxW, boxH, boxDepth]} />
+        <meshStandardMaterial color="#EAE6DF" roughness={0.35} metalness={0.05} />
+      </mesh>
+      {/* Top Cap Ledge (Marble Trim) */}
+      <mesh position={[0, boxH / 2 + 0.3, 0]} receiveShadow>
+        <boxGeometry args={[boxW + 0.8, 0.6, boxDepth + 0.8]} />
+        <meshStandardMaterial color="#1E293B" roughness={0.25} metalness={0.8} />
+      </mesh>
+      {/* Kohler Dual-Flush Actuator Plate (Polished Metallic) */}
+      <group position={[0, 8, boxDepth / 2 + 0.2]}>
+        <mesh receiveShadow castShadow>
+          <boxGeometry args={[9.5, 6.5, 0.4]} />
+          <meshStandardMaterial color="#CBD5E1" roughness={0.1} metalness={0.9} />
+        </mesh>
+        <mesh position={[-2, 0, 0.25]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[1.5, 1.5, 0.3, 24]} />
+          <meshStandardMaterial color="#F8FAFC" roughness={0.15} metalness={0.85} />
+        </mesh>
+        <mesh position={[2, 0, 0.25]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[1.1, 1.1, 0.3, 24]} />
+          <meshStandardMaterial color="#F8FAFC" roughness={0.15} metalness={0.85} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+// Bathtub Fixture: Freestanding vs Drop-In Platform with dynamic OBJ loading
 function BathtubFixture({ bathtubPlacement, isSelected, onClick, onCycleProduct, hideHotspots }) {
   if (!bathtubPlacement) return null;
 
+  const [objModel, setObjModel] = useState(null);
   const subcat = (bathtubPlacement.subcategory || bathtubPlacement.model_name || "").toLowerCase();
   const isDropIn = subcat.includes("drop_in") || subcat.includes("drop-in") || subcat.includes("drop");
   const matProps = getProductMaterialProps(bathtubPlacement);
 
-  const wIn = Number(bathtubPlacement.width_in) || 50;
-  const dIn = Number(bathtubPlacement.depth_in) || 28;
+  const rawW = Number(bathtubPlacement.width_in) || 50;
+  const rawD = Number(bathtubPlacement.depth_in) || 28;
+  const wIn = Math.max(rawW, rawD);
+  const dIn = Math.min(rawW, rawD);
   const hIn = Number(bathtubPlacement.height_in) || 20;
 
   const posX = bathtubPlacement.x + wIn / 2;
   const posZ = bathtubPlacement.y + dIn / 2;
   const rotY = ((bathtubPlacement.rotation_deg || 0) * Math.PI) / 180;
+
+  const { sku_code, obj_file_path, has_3d_model } = bathtubPlacement;
+
+  useEffect(() => {
+    let active = true;
+    if (has_3d_model && sku_code && obj_file_path) {
+      const loader = new OBJLoader();
+      loader.load(
+        `${BASE_URL}/api/3d/${sku_code}.obj`,
+        (object) => {
+          if (!active || !object) return;
+          object.rotation.x = -Math.PI / 2;
+          object.updateMatrixWorld(true);
+
+          let box = new THREE.Box3().setFromObject(object);
+          let size = box.getSize(new THREE.Vector3());
+          if (!size || size.x <= 0 || size.z <= 0) return;
+
+          const scale = Math.min(wIn / (size.x || 1), dIn / (size.z || 1));
+          const center = box.getCenter(new THREE.Vector3());
+
+          object.position.x = -center.x * scale;
+          if (isDropIn) {
+            // Top rim flange sits at local Y=0 so tub hangs sunken downward inside platform
+            object.position.y = -box.max.y * scale;
+          } else {
+            // Bottom of tub sits at local Y=0 on plinth deck
+            object.position.y = -box.min.y * scale;
+          }
+          object.position.z = -center.z * scale;
+          object.scale.set(scale, scale, scale);
+
+          object.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              child.material = new THREE.MeshStandardMaterial({
+                color: matProps.color,
+                roughness: matProps.roughness,
+                metalness: matProps.metalness,
+                side: THREE.DoubleSide,
+              });
+            }
+          });
+
+          const group = new THREE.Group();
+          group.add(object);
+          if (active) setObjModel(group);
+        },
+        undefined,
+        (err) => setObjModel(null)
+      );
+    } else {
+      setObjModel(null);
+    }
+    return () => { active = false; };
+  }, [sku_code, has_3d_model, obj_file_path, wIn, dIn, isDropIn, matProps.color]);
 
   const handleBathtubClick = (e) => {
     e.stopPropagation();
@@ -432,33 +681,63 @@ function BathtubFixture({ bathtubPlacement, isSelected, onClick, onCycleProduct,
   };
 
   if (isDropIn) {
-    // Drop-In Tub: Built inside a raised tiled platform with an exact 1-inch border on all sides!
-    const platformW = wIn + 2; // 1-inch border left & right
-    const platformD = dIn + 2; // 1-inch border front & back
+    // Drop-In Tub: Sunken inside a hollow tiled platform deck surround
+    const platformW = wIn + 4;
+    const platformD = dIn + 4;
     const platformH = hIn;
 
     return (
       <group position={[posX, 0, posZ]} rotation={[0, rotY, 0]} onClick={handleBathtubClick}>
-        {/* Tiled Platform Enclosure (1-inch overhang border on all sides) */}
-        <mesh position={[0, platformH / 2, 0]} receiveShadow castShadow>
-          <boxGeometry args={[platformW, platformH, platformD]} />
+        {/* Hollow Tiled Platform Surround Walls */}
+        {/* Front Surround Wall */}
+        <mesh position={[0, platformH / 2, platformD / 2 - 1]} receiveShadow castShadow>
+          <boxGeometry args={[platformW, platformH, 2]} />
           <meshStandardMaterial color="#EAE6DF" roughness={0.35} metalness={0.05} />
         </mesh>
-        {/* Tiled Top Deck Edge Surface */}
-        <mesh position={[0, platformH - 0.2, 0]} receiveShadow>
-          <boxGeometry args={[platformW + 0.5, 0.4, platformD + 0.5]} />
+        {/* Back Surround Wall */}
+        <mesh position={[0, platformH / 2, -platformD / 2 + 1]} receiveShadow castShadow>
+          <boxGeometry args={[platformW, platformH, 2]} />
+          <meshStandardMaterial color="#EAE6DF" roughness={0.35} metalness={0.05} />
+        </mesh>
+        {/* Left Surround Wall */}
+        <mesh position={[-platformW / 2 + 1, platformH / 2, 0]} receiveShadow castShadow>
+          <boxGeometry args={[2, platformH, platformD - 4]} />
+          <meshStandardMaterial color="#EAE6DF" roughness={0.35} metalness={0.05} />
+        </mesh>
+        {/* Right Surround Wall */}
+        <mesh position={[platformW / 2 - 1, platformH / 2, 0]} receiveShadow castShadow>
+          <boxGeometry args={[2, platformH, platformD - 4]} />
+          <meshStandardMaterial color="#EAE6DF" roughness={0.35} metalness={0.05} />
+        </mesh>
+
+        {/* Tiled Top Deck Edge Surface Trim */}
+        <mesh position={[0, platformH - 0.2, platformD / 2 - 1]} receiveShadow>
+          <boxGeometry args={[platformW + 0.4, 0.4, 2.4]} />
           <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.1} />
         </mesh>
-        {/* Sunken Porcelain Tub Inner Rim */}
-        <mesh position={[0, platformH - 1, 0]} castShadow receiveShadow>
-          <boxGeometry args={[wIn, 2, dIn]} />
-          <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+        <mesh position={[0, platformH - 0.2, -platformD / 2 + 1]} receiveShadow>
+          <boxGeometry args={[platformW + 0.4, 0.4, 2.4]} />
+          <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.1} />
         </mesh>
-        {/* Deep Water Basin Interior Hollow */}
-        <mesh position={[0, platformH / 2 + 1, 0]}>
-          <boxGeometry args={[wIn - 4, platformH - 3, dIn - 4]} />
-          <meshStandardMaterial color="#38BDF8" roughness={0.05} opacity={0.65} transparent />
-        </mesh>
+
+        {objModel ? (
+          <group position={[0, platformH + 0.2, 0]}>
+            <primitive object={objModel} />
+          </group>
+        ) : (
+          <>
+            {/* Sunken Porcelain Tub Inner Rim Flange */}
+            <mesh position={[0, platformH - 0.5, 0]} castShadow receiveShadow>
+              <boxGeometry args={[wIn + 2, 1, dIn + 2]} />
+              <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+            </mesh>
+            {/* Deep Water Basin Interior Hollow */}
+            <mesh position={[0, platformH / 2, 0]}>
+              <boxGeometry args={[wIn, platformH - 2, dIn]} />
+              <meshStandardMaterial color="#38BDF8" roughness={0.05} opacity={0.65} transparent />
+            </mesh>
+          </>
+        )}
 
         {!hideHotspots && (
           <OrangeHotspotStub
@@ -474,23 +753,46 @@ function BathtubFixture({ bathtubPlacement, isSelected, onClick, onCycleProduct,
     );
   }
 
-  // Freestanding Bathtub: Sits directly on the bathroom floor
+  // Freestanding Bathtub: Sits on a designer teak wood or marble plinth deck
+  const plinthW = wIn + 6;
+  const plinthD = dIn + 6;
+  const plinthH = 2.5;
+
   return (
-    <group position={[posX, hIn / 2, posZ]} rotation={[0, rotY, 0]} onClick={handleBathtubClick}>
-      {/* Main Tub Body */}
-      <mesh castShadow receiveShadow position={[0, 0, 0]}>
-        <boxGeometry args={[wIn, hIn, dIn]} />
-        <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+    <group position={[posX, 0, posZ]} rotation={[0, rotY, 0]} onClick={handleBathtubClick}>
+      {/* Luxury Designer Accent Plinth Platform */}
+      <mesh position={[0, plinthH / 2, 0]} receiveShadow castShadow>
+        <boxGeometry args={[plinthW, plinthH, plinthD]} />
+        <meshStandardMaterial color="#1E293B" roughness={0.3} metalness={0.7} />
       </mesh>
-      {/* Bath Interior Water */}
-      <mesh position={[0, 2, 0]}>
-        <boxGeometry args={[wIn - 4, hIn - 4, dIn - 4]} />
-        <meshStandardMaterial color="#0284C7" roughness={0.05} opacity={0.6} transparent />
+      {/* Plinth LED Recessed Under-Glow Light strip */}
+      <mesh position={[0, 0.2, 0]}>
+        <boxGeometry args={[plinthW + 1, 0.4, plinthD + 1]} />
+        <meshStandardMaterial color="#38BDF8" emissive="#0EA5E9" emissiveIntensity={0.6} transparent opacity={0.4} />
       </mesh>
+      
+      {objModel ? (
+        <group position={[0, plinthH, 0]}>
+          <primitive object={objModel} />
+        </group>
+      ) : (
+        <>
+          {/* Main Tub Body sitting gracefully on plinth platform */}
+          <mesh castShadow receiveShadow position={[0, plinthH + hIn / 2, 0]}>
+            <boxGeometry args={[wIn, hIn, dIn]} />
+            <meshStandardMaterial color={matProps.color} roughness={matProps.roughness} metalness={matProps.metalness} />
+          </mesh>
+          {/* Bath Interior Water */}
+          <mesh position={[0, plinthH + hIn / 2 + 2, 0]}>
+            <boxGeometry args={[wIn - 4, hIn - 4, dIn - 4]} />
+            <meshStandardMaterial color="#0284C7" roughness={0.05} opacity={0.6} transparent />
+          </mesh>
+        </>
+      )}
 
       {!hideHotspots && (
         <OrangeHotspotStub
-          position={[0, hIn / 2 + 4, 0]}
+          position={[0, plinthH + hIn + 4, 0]}
           placement={bathtubPlacement}
           isSelected={isSelected}
           onClick={() => onClick(bathtubPlacement)}
@@ -506,8 +808,10 @@ function BathtubFixture({ bathtubPlacement, isSelected, onClick, onCycleProduct,
 function WalkInShowerEnclosure({ bathPlacement, roomWidth, roomDepth, isSelected, onClick, onCycleProduct, hideHotspots }) {
   if (!bathPlacement) return null;
 
-  const wIn = Number(bathPlacement.width_in) || 50;
-  const dIn = Number(bathPlacement.depth_in) || 28;
+  const rawW = Number(bathPlacement.width_in) || 50;
+  const rawD = Number(bathPlacement.depth_in) || 28;
+  const wIn = Math.max(rawW, rawD);
+  const dIn = Math.min(rawW, rawD);
   const heightIn = 84; // 7 feet tall glass walls
 
   const posX = bathPlacement.x + wIn / 2;
@@ -897,10 +1201,10 @@ function OrangeHotspotStub({ position, placement, isSelected, onClick, onCyclePr
                 zIndex: 30,
               }}
             >
-              {/* SVG Pointer Bar starting OUTSIDE the circle and merging seamlessly into category title underline */}
+              {/* SVG Pointer Bar overlapping the interaction point circle center and merging into category title underline */}
               <svg width="46" height="38" style={{ overflow: "visible", flexShrink: 0, display: "block" }}>
                 <polyline
-                  points={isBelow ? "4,4 24,28 46,28" : "4,34 24,6 46,6"}
+                  points={isBelow ? "0,0 20,24 46,24" : "0,34 20,6 46,6"}
                   fill="none"
                   stroke="#D97E3A"
                   strokeWidth="2.5"
@@ -970,17 +1274,41 @@ function OrangeHotspotStub({ position, placement, isSelected, onClick, onCyclePr
   );
 }
 
-function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots }) {
-  const { sku_code, category, x, y, width_in, depth_in, model_name, obj_file_path, platform_height_offset } = placement;
+function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots, roomWidth, roomDepth }) {
+  const { sku_code, category, x, y, width_in, depth_in, model_name, obj_file_path, platform_height_offset, rotation_deg, wallSnapSide } = placement;
   const [model, setModel] = useState(null);
 
-  const wIn = Number(width_in) || 16;
-  const dIn = Number(depth_in) || 16;
+  const catLower = (category || '').toLowerCase();
+  const isToilet = catLower === 'toilet';
+
+  const rawW = Number(width_in) || 16;
+  const rawD = Number(depth_in) || 16;
+  let wIn = rawW;
+  let dIn = rawD;
+
   let centerX = (Number(x) || 0) + wIn / 2;
   let centerZ = (Number(y) || 0) + dIn / 2;
 
-  // Lock counter platform center to washbasin center for exact 3D alignment
-  if ((category || '').toLowerCase() === 'sink_platform' || (category || '').toLowerCase() === 'cabinet') {
+  const rotDeg = rotation_deg ?? (wallSnapSide === 'left' ? 90 : 0);
+
+  if (isToilet) {
+    const roomW = roomWidth || 96;
+    const roomD = roomDepth || 72;
+    if (rotDeg === 90 || wallSnapSide === 'left') {
+      centerX = 6 + dIn / 2;
+      centerZ = (Number(y) || 0) + wIn / 2;
+    } else if (rotDeg === 270 || wallSnapSide === 'right') {
+      centerX = roomW - 6 - dIn / 2;
+      centerZ = (Number(y) || 0) + wIn / 2;
+    } else if (rotDeg === 180 || wallSnapSide === 'bottom') {
+      centerX = (Number(x) || 0) + wIn / 2;
+      centerZ = roomD - 6 - dIn / 2;
+    } else {
+      centerX = (Number(x) || 0) + wIn / 2;
+      centerZ = 6 + dIn / 2;
+    }
+  } else if (catLower === 'sink_platform' || catLower === 'cabinet') {
+    // Lock counter platform center to washbasin center for exact 3D alignment
     const washbasinItem = layoutData?.find(p => (p.category || '').toLowerCase() === 'washbasin' || (p.category || '').toLowerCase() === 'wash_basin');
     if (washbasinItem) {
       const wbW = Number(washbasinItem.width_in) || 22;
@@ -990,8 +1318,8 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
     }
   }
 
-  const platformOffset = Number(platform_height_offset) || 0;
-  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
+  const platformOffset = isToilet ? 4 : (Number(platform_height_offset) || 0);
+  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes(catLower);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -1003,9 +1331,9 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
           if (!isSubscribed || !object) return;
 
           const isVeil20704 = sku_code && sku_code.includes("20704");
-          const isVeil20703 = sku_code && sku_code.includes("20703");
+          const isAleo72275 = sku_code && sku_code.includes("72275");
 
-          if (isVeil20704) {
+          if (isVeil20704 || isAleo72275) {
             object.rotation.set(0, 0, 0);
           } else {
             object.rotation.x = -Math.PI / 2;
@@ -1081,13 +1409,13 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
     return (
       <group
         position={[centerX, platformOffset, centerZ]}
-        rotation={[0, ((placement.rotation_deg || 0) * Math.PI) / 180, 0]}
+        rotation={[0, ((rotDeg || 0) * Math.PI) / 180, 0]}
         onClick={handleClick}
       >
         <primitive object={model} />
         {isCatalogueItem && !hideHotspots && (
           <OrangeHotspotStub
-            position={(category || '').toLowerCase().includes('wash') ? [0, 6, 2] : [0, 20, 0]}
+            position={(category || '').toLowerCase().includes('wash') ? [0, 6, 2] : [0, 18, 0]}
             placement={placement}
             isSelected={isSelected}
             onClick={() => onClick(placement)}
@@ -1107,18 +1435,47 @@ function OBJProduct({ placement, isSelected, onClick, onCycleProduct, layoutData
       onClick={onClick}
       onCycleProduct={onCycleProduct}
       hideHotspots={hideHotspots}
+      roomWidth={roomWidth}
+      roomDepth={roomDepth}
     />
   );
 }
 
-function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots }) {
-  const { x, y, width_in, depth_in, model_name, is_platform, is_placeholder, platform_height_offset, rotation_deg, category } = placement;
+function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutData, hideHotspots, roomWidth, roomDepth }) {
+  const { x, y, width_in, depth_in, model_name, is_platform, is_placeholder, platform_height_offset, rotation_deg, wallSnapSide, category } = placement;
 
-  let centerX = x + width_in / 2;
-  let centerZ = y + depth_in / 2;
+  const catLower = (category || '').toLowerCase();
+  const isToilet = catLower === 'toilet';
+  const isWashbasin = catLower === 'washbasin' || catLower === 'wash_basin';
+  const isBathtub = catLower === 'bathtub';
+  const isDustbin = catLower === 'dustbin';
+  const isTowelBar = catLower === 'towel_bar';
 
-  // Lock counter platform center to washbasin center for exact 3D alignment
-  if (is_platform || (category || '').toLowerCase() === 'sink_platform' || (category || '').toLowerCase() === 'cabinet') {
+  const wIn = Number(width_in) || 16;
+  const dIn = Number(depth_in) || 16;
+
+  let centerX = x + wIn / 2;
+  let centerZ = y + dIn / 2;
+  const rotDeg = rotation_deg ?? (wallSnapSide === 'left' ? 90 : 0);
+
+  if (isToilet) {
+    const roomW = roomWidth || 96;
+    const roomD = roomDepth || 72;
+    if (rotDeg === 90 || wallSnapSide === 'left') {
+      centerX = 6 + dIn / 2;
+      centerZ = (Number(y) || 0) + wIn / 2;
+    } else if (rotDeg === 270 || wallSnapSide === 'right') {
+      centerX = roomW - 6 - dIn / 2;
+      centerZ = (Number(y) || 0) + wIn / 2;
+    } else if (rotDeg === 180 || wallSnapSide === 'bottom') {
+      centerX = (Number(x) || 0) + wIn / 2;
+      centerZ = roomD - 6 - dIn / 2;
+    } else {
+      centerX = (Number(x) || 0) + wIn / 2;
+      centerZ = 6 + dIn / 2;
+    }
+  } else if (is_platform || catLower === 'sink_platform' || catLower === 'cabinet') {
+    // Lock counter platform center to washbasin center for exact 3D alignment
     const washbasinItem = layoutData?.find(p => (p.category || '').toLowerCase() === 'washbasin' || (p.category || '').toLowerCase() === 'wash_basin');
     if (washbasinItem) {
       const wbW = Number(washbasinItem.width_in) || 22;
@@ -1128,8 +1485,8 @@ function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutD
     }
   }
 
-  const platformOffset = platform_height_offset || 0;
-  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes((category || '').toLowerCase());
+  const platformOffset = isToilet ? 4 : (platform_height_offset || 0);
+  const isCatalogueItem = ['toilet', 'washbasin', 'wash_basin', 'bathtub'].includes(catLower);
 
   const handleClick = (e) => {
     e.stopPropagation();
@@ -1138,36 +1495,30 @@ function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutD
     }
   };
 
-  const isToilet = category === 'toilet';
-  const isWashbasin = category === 'washbasin' || category === 'wash_basin';
-  const isBathtub = category === 'bathtub';
-  const isDustbin = category === 'dustbin';
-  const isTowelBar = category === 'towel_bar';
-
-  let geom = <boxGeometry args={[width_in, 16, depth_in]} />;
+  let geom = <boxGeometry args={[wIn, 16, dIn]} />;
   let matColor = getProductColor(model_name);
 
   if (is_platform) {
-    geom = <boxGeometry args={[width_in, 12, depth_in]} />;
+    geom = <boxGeometry args={[wIn, 12, dIn]} />;
     matColor = "#1E293B";
   } else if (isWashbasin) {
-    geom = <boxGeometry args={[width_in, 6, depth_in]} />;
+    geom = <boxGeometry args={[wIn, 6, dIn]} />;
   } else if (isToilet) {
-    geom = <boxGeometry args={[width_in, 18, depth_in]} />;
+    geom = <boxGeometry args={[dIn, 18, wIn]} />;
   } else if (isBathtub) {
-    geom = <boxGeometry args={[width_in, 20, depth_in]} />;
+    geom = <boxGeometry args={[wIn, 20, dIn]} />;
   } else if (isDustbin) {
-    geom = <cylinderGeometry args={[width_in / 2, width_in / 2.2, 16, 20]} />;
+    geom = <cylinderGeometry args={[wIn / 2, wIn / 2.2, 16, 20]} />;
     matColor = "#475569";
   } else if (isTowelBar) {
-    geom = <boxGeometry args={[width_in, 3, Math.max(2, depth_in)]} />;
+    geom = <boxGeometry args={[wIn, 3, Math.max(2, dIn)]} />;
     matColor = "#94A3B8";
   }
 
   return (
     <group
       position={[centerX, platformOffset + (is_platform ? 6 : 9), centerZ]}
-      rotation={[0, ((rotation_deg || 0) * Math.PI) / 180, 0]}
+      rotation={[0, ((rotDeg || 0) * Math.PI) / 180, 0]}
       onClick={handleClick}
     >
       <mesh castShadow receiveShadow>
@@ -1180,7 +1531,7 @@ function SimpleProduct({ placement, isSelected, onClick, onCycleProduct, layoutD
       </mesh>
       {isCatalogueItem && !hideHotspots && (
         <OrangeHotspotStub
-          position={isWashbasin ? [0, 6, 2] : [0, 20, 0]}
+          position={isWashbasin ? [0, 6, 2] : [0, 18, 0]}
           placement={placement}
           isSelected={isSelected}
           onClick={() => onClick(placement)}
@@ -1281,6 +1632,8 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
     }
   }, [controls, defaultOrbitTarget, customCameraTarget]);
 
+  const toiletPlacement = layoutData.find(p => (p.category || '').toLowerCase() === 'toilet');
+
   return (
     <>
       <ambientLight intensity={0.95} color="#FFFFFF" />
@@ -1318,6 +1671,13 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
         mirrorPlacement={mirrorPlacement}
       />
 
+      {/* Render specialized architectural wall carrier for toilet */}
+      <ToiletCarrierWallBox
+        placement={toiletPlacement}
+        roomWidth={roomWidthIn}
+        roomDepth={roomDepthIn}
+      />
+
       {/* Render specialized fixtures */}
       <FaucetFixture
         faucetPlacement={faucetPlacement}
@@ -1326,6 +1686,8 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
         onClick={(p) => handleSelectProduct(p, camera, controls)}
         onCycleProduct={onCycleProduct}
         hideHotspots={hideHotspots}
+        roomWidth={roomWidthIn}
+        roomDepth={roomDepthIn}
       />
       <TowelBarFixture
         placement={towelBarPlacement}
@@ -1367,8 +1729,8 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
           ? pCat === selectedCategory
           : selectedSku === placement.sku_code;
 
-        let itemRot = placement.rotation_deg || 0;
-        if (!placement.rotation_deg) {
+        let itemRot = placement.rotation_deg;
+        if (itemRot === undefined || itemRot === null) {
           const cX = placement.x + (placement.width_in / 2);
           const cZ = placement.y + (placement.depth_in / 2);
           const distBack = cZ;
@@ -1394,6 +1756,8 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
             onCycleProduct={onCycleProduct}
             layoutData={layoutData}
             hideHotspots={hideHotspots}
+            roomWidth={roomWidthIn}
+            roomDepth={roomDepthIn}
           />
         ) : (
           <SimpleProduct
@@ -1404,6 +1768,8 @@ function SceneContent({ layoutData, roomWidthIn, roomDepthIn, aestheticTheme, fl
             onCycleProduct={onCycleProduct}
             layoutData={layoutData}
             hideHotspots={hideHotspots}
+            roomWidth={roomWidthIn}
+            roomDepth={roomDepthIn}
           />
         );
       })}
@@ -1505,14 +1871,74 @@ export default function LayoutViewer3D({ layoutData, roomWidth, roomDepth, roomH
     let eyeHeight = pOffset + 26;
     let camOffsetDist = 44;
 
-    if (cat.includes("shower") || product.is_shower_head) {
-      const showerTarget = new THREE.Vector3(cX, 56, cZ);
-      const showerPos = new THREE.Vector3(cX, 66, Math.min(roomDepthIn * 1.05, cZ + 68));
+    const isBathSection = cat.includes("bathtub") || cat.includes("bath_tub") || cat.includes("shower") || product.is_shower_head;
+
+    if (normCat === "faucet") {
+      const washbasinItem = layoutData?.find(p => (p.category || '').toLowerCase().includes('wash'));
+      const faucetX = washbasinItem ? (washbasinItem.x + (washbasinItem.width_in || 22) / 2) : cX;
+      const faucetZ = washbasinItem ? Math.max(2, washbasinItem.y - 2) : cZ;
+      const faucetTarget = new THREE.Vector3(faucetX, 22, faucetZ);
+      const faucetEyeHeight = 26;
+      const faucetCamOffset = 32;
+
+      const distBack = faucetZ;
+      const distFront = roomDepthIn - faucetZ;
+      const distLeft = faucetX;
+      const distRight = roomWidthIn - faucetX;
+      const minDist = Math.min(distBack, distFront, distLeft, distRight);
+
+      let pos;
+      if (minDist === distFront) {
+        pos = new THREE.Vector3(faucetX, faucetEyeHeight, Math.max(10, faucetZ - faucetCamOffset));
+      } else if (minDist === distLeft) {
+        pos = new THREE.Vector3(Math.min(roomWidthIn - 10, faucetX + faucetCamOffset), faucetEyeHeight, faucetZ);
+      } else if (minDist === distRight) {
+        pos = new THREE.Vector3(Math.max(10, faucetX - faucetCamOffset), faucetEyeHeight, faucetZ);
+      } else {
+        pos = new THREE.Vector3(faucetX, faucetEyeHeight, Math.min(roomDepthIn - 10, faucetZ + faucetCamOffset));
+      }
+
       setSelectedCategory(normCat);
       setSelectedSku(product.sku_code);
       setCustomCameraTarget({
-        pos: showerPos,
-        target: showerTarget,
+        pos,
+        target: faucetTarget,
+        isResetting: false,
+      });
+      onProductClick?.(product);
+      return;
+    }
+
+    if (isBathSection) {
+      const wIn = Number(product.width_in) || 55;
+      const dIn = Number(product.depth_in) || 30;
+
+      const bathTarget = new THREE.Vector3(cX, 32, cZ);
+      const bathEyeHeight = 52;
+      const bathCamOffset = Math.max(76, Math.max(wIn, dIn) * 1.45);
+
+      const distBack = cZ;
+      const distFront = roomDepthIn - cZ;
+      const distLeft = cX;
+      const distRight = roomWidthIn - cX;
+      const minDist = Math.min(distBack, distFront, distLeft, distRight);
+
+      let bathPos;
+      if (minDist === distFront) {
+        bathPos = new THREE.Vector3(cX, bathEyeHeight, Math.max(10, cZ - bathCamOffset));
+      } else if (minDist === distLeft) {
+        bathPos = new THREE.Vector3(Math.min(roomWidthIn - 10, cX + bathCamOffset), bathEyeHeight, cZ);
+      } else if (minDist === distRight) {
+        bathPos = new THREE.Vector3(Math.max(10, cX - bathCamOffset), bathEyeHeight, cZ);
+      } else {
+        bathPos = new THREE.Vector3(cX, bathEyeHeight, Math.min(roomDepthIn - 10, cZ + bathCamOffset));
+      }
+
+      setSelectedCategory(normCat);
+      setSelectedSku(product.sku_code);
+      setCustomCameraTarget({
+        pos: bathPos,
+        target: bathTarget,
         isResetting: false,
       });
       onProductClick?.(product);

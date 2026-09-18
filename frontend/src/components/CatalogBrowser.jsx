@@ -20,10 +20,10 @@ function getCatalogMaterialProps(product) {
     return { color: "#1A1A1A", roughness: 0.85, metalness: 0.15 };
   }
   if (finish.includes("bronze") || name.includes("bronze")) {
-    return { color: "#8C6D46", roughness: 0.3, metalness: 0.85 };
+    return { color: "#D4AB73", roughness: 0.2, metalness: 0.8 };
   }
   if (finish.includes("gold") || name.includes("gold") || name.includes("brass")) {
-    return { color: "#D4AF37", roughness: 0.25, metalness: 0.9 };
+    return { color: "#F5D061", roughness: 0.15, metalness: 0.85 };
   }
   if (finish.includes("chrome") || name.includes("chrome") || product?.category === "faucet") {
     return { color: "#E2E8F0", roughness: 0.1, metalness: 0.95 };
@@ -48,7 +48,8 @@ function Product3DMesh({ product }) {
           url,
           (object) => {
             if (!active || !object) return;
-            if (sku_code.includes("20704")) {
+            const isAleo72275 = sku_code && sku_code.includes("72275");
+            if (sku_code.includes("20704") || isAleo72275) {
               object.rotation.set(0, 0, 0);
             } else {
               object.rotation.x = -Math.PI / 2;
@@ -273,7 +274,7 @@ function Product3DThumbnail({ product, height = 190, interactive = true }) {
   );
 }
 
-export default function CatalogBrowser({ selectedProductsMap, onSelectProduct }) {
+export default function CatalogBrowser({ selectedProductsMap, activeLayoutData, onSelectProduct }) {
   const [products, setProducts] = useState(FALLBACK_CATALOGUE);
   const [category, setCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -414,7 +415,23 @@ export default function CatalogBrowser({ selectedProductsMap, onSelectProduct })
           gap: "24px",
         }}>
           {filteredProducts.map((product) => {
-            const isSelectedInPlan = selectedProductsMap && selectedProductsMap[product.category]?.sku_code === product.sku_code;
+            const normCat = (product.category || "").toLowerCase().replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
+
+            const isSelectedInMap = selectedProductsMap && (
+              selectedProductsMap[product.category]?.sku_code === product.sku_code ||
+              selectedProductsMap[normCat]?.sku_code === product.sku_code
+            );
+
+            const isSelectedInLayout = Array.isArray(activeLayoutData) && activeLayoutData.some((p) => {
+              if (!p) return false;
+              const pCat = (p.category || "").toLowerCase().replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
+              const pSku = p.sku_code;
+
+              if (pCat !== normCat) return false;
+              return pSku && pSku === product.sku_code;
+            });
+
+            const isSelectedInPlan = isSelectedInMap || isSelectedInLayout;
             
             // Subcategory check: If subcategory is 'none' or absent, leave it blank
             const subcategoryRaw = product.subcategory || "";
