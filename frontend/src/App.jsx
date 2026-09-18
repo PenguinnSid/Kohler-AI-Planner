@@ -68,7 +68,7 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
   const cabinetY = washbasinY - (cabinetH - washbasinH) / 2;
 
   const items = activeItems || {
-    toilet: { x: 4, y: Math.max(30, depthIn - 34), w: 16, h: 26, rot: 0 },
+    toilet: { x: 0, y: Math.max(34, depthIn - 34), w: 16, h: 26, rot: 90, wallSnapSide: "left" },
     washbasin: { x: washbasinX, y: washbasinY, w: washbasinW, h: washbasinH, rot: 0 },
     cabinet: { x: cabinetX, y: cabinetY, w: cabinetW, h: cabinetH, rot: 0 },
     bathtub: { x: 4, y: 4, w: 50, h: 28, rot: 0 },
@@ -77,18 +77,19 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
     mirror: { x: Math.max(65, widthIn - 31), y: 0, w: 26, h: 3, rot: 0 },
   };
 
-  return [
+  const placements = [
     {
       sku_code: "30438IN",
       category: "toilet",
       model_name: "Reach Wall-Hung Round Toilet",
       price_inr: 20000,
-      x: items.toilet?.x ?? 4,
+      x: items.toilet?.x ?? 0,
       y: items.toilet?.y ?? 38,
       width_in: 14.5,
       depth_in: 21,
       height_in: 18.5,
-      rotation_deg: items.toilet?.rot ?? 0,
+      rotation_deg: items.toilet?.rot ?? 90,
+      wallSnapSide: items.toilet?.wallSnapSide ?? "left",
       obj_file_path: "models/reach_toilet.obj",
       has_3d_model: true,
     },
@@ -146,11 +147,12 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       sku_code: "custom_window",
       category: "window",
       model_name: "Bathroom Window",
-      x: items.window?.x ?? Math.max(0, widthIn / 2 - 16),
+      x: items.window?.x ?? Math.max(0, Math.min(widthIn - 34, washbasinX - 36)),
       y: 0,
       width_in: items.window?.w ?? 32,
       depth_in: 2,
       rotation_deg: items.window?.rot ?? 0,
+      wallSnapSide: items.window?.wallSnapSide ?? "top",
     },
     {
       sku_code: "custom_door",
@@ -161,12 +163,13 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
       width_in: items.door?.w ?? 32,
       depth_in: items.door?.h ?? 4,
       rotation_deg: items.door?.rot ?? 0,
+      wallSnapSide: items.door?.wallSnapSide ?? "bottom",
     },
     {
       sku_code: "custom_mirror",
       category: "mirror",
       model_name: "Vanity Mirror",
-      x: items.mirror?.x ?? Math.max(65, widthIn - 31),
+      x: items.mirror?.x ?? (washbasinX + (washbasinW - 26) / 2),
       y: items.mirror?.y ?? 0,
       width_in: items.mirror?.w ?? 26,
       depth_in: items.mirror?.h ?? 3,
@@ -203,8 +206,10 @@ function generateFallbackLayout(roomWidthFt, roomDepthFt, activeItems) {
   }
 
   return placements.filter((p) => {
-    if (p.sku_code.includes("platform") || p.sku_code.includes("wash_basin") || p.sku_code.includes("faucet")) return true;
-    return !!items[p.category];
+    const pCat = (p.category || "").toLowerCase();
+    const normCat = pCat.replace("wash_basin", "washbasin").replace("bath_tub", "bathtub");
+    if (pCat === "sink_platform" || pCat === "faucet" || normCat === "washbasin") return true;
+    return !!items[pCat] || !!items[normCat];
   });
 }
 
@@ -282,14 +287,21 @@ export default function App() {
     };
 
     return baseLayout.map((placement) => {
-      const pCat = placement.category;
-      let customProd = selectedProductsMap[pCat] || selectedProductsMap[pCat === "wash_basin" ? "washbasin" : pCat] || selectedProductsMap[pCat === "bath_tub" ? "bathtub" : pCat];
+      const pCat = (placement.category || "").toLowerCase();
+      const normCat = pCat.replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
+      let customProd = selectedProductsMap[placement.category] || selectedProductsMap[pCat] || selectedProductsMap[normCat];
 
-      if (!customProd && bathSectionMode === "bathtub" && (pCat === "bathtub" || pCat === "bath_tub")) {
+      if (!customProd && bathSectionMode === "bathtub" && normCat === "bathtub") {
         customProd = defaultBathtubProd;
       }
 
       if (customProd) {
+        const isBath = normCat === "bathtub" || normCat === "shower";
+        const rawW = customProd.width_in || placement.width_in || 50;
+        const rawD = customProd.depth_in || placement.depth_in || 28;
+        const normW = isBath ? Math.max(rawW, rawD) : rawW;
+        const normD = isBath ? Math.min(rawW, rawD) : rawD;
+
         return {
           ...placement,
           sku_code: customProd.sku_code,
@@ -299,8 +311,8 @@ export default function App() {
           colour: customProd.colour,
           has_3d_model: customProd.has_3d_model,
           obj_file_path: customProd.obj_file_path,
-          width_in: customProd.width_in || placement.width_in,
-          depth_in: customProd.depth_in || placement.depth_in,
+          width_in: normW,
+          depth_in: normD,
           height_in: customProd.height_in || placement.height_in,
         };
       }
@@ -342,20 +354,75 @@ export default function App() {
     },
   ];
 
+  const applyProductSelection = (product, categoryKey, normCat, rawCat) => {
+    const isBath = normCat === "bathtub" || normCat === "shower";
+    const pW = isBath ? Math.max(product.width_in || 50, product.depth_in || 28) : product.width_in;
+    const pH = isBath ? Math.min(product.width_in || 50, product.depth_in || 28) : product.depth_in;
+
+    const currentItems = itemsState || {
+      toilet: { x: 0, y: Math.max(34, roomDepthFt * 12 - 34), w: 16, h: 26, rot: 90, wallSnapSide: "left" },
+      washbasin: { x: Math.max(4, roomWidthFt * 12 - 32), y: 6, w: 22, h: 18, rot: 0, wallSnapSide: "top" },
+      cabinet: { x: Math.max(1, roomWidthFt * 12 - 35), y: 3, w: 28, h: 24, rot: 0, wallSnapSide: "top" },
+      bathtub: { x: 4, y: 4, w: 50, h: 28, rot: 0, wallSnapSide: "top" },
+      window: { x: Math.max(0, roomWidthFt * 12 / 2 - 16), y: 0, w: 32, h: 4, rot: 0, wallSnapSide: "top" },
+      door: { x: Math.max(4, roomWidthFt * 12 - 38), y: roomDepthFt * 12 - 4, w: 32, h: 4, rot: 180, wallSnapSide: "bottom" },
+      mirror: { x: Math.max(65, roomWidthFt * 12 - 31), y: 0, w: 26, h: 3, rot: 0, wallSnapSide: "top" },
+    };
+
+    if (isBath) {
+      const proposedState = {
+        ...currentItems,
+        bathtub: {
+          ...currentItems.bathtub,
+          w: pW,
+          h: pH,
+        }
+      };
+
+      const roomWIn = roomWidthFt * 12;
+      const roomDIn = roomDepthFt * 12;
+      const { arrangedItems } = autoArrangeLayout(proposedState, roomWIn, roomDIn, bathSectionMode);
+      setItemsState(arrangedItems);
+    } else if (currentItems[normCat] && product.width_in && product.depth_in) {
+      setItemsState({
+        ...currentItems,
+        [normCat]: {
+          ...currentItems[normCat],
+          w: pW,
+          h: pH,
+        }
+      });
+    }
+
+    setSelectedProductDetails(product);
+    const nextMap = {
+      ...selectedProductsMap,
+      [categoryKey]: product,
+      [rawCat]: product,
+      [normCat]: product,
+    };
+    if (normCat === "bathtub") {
+      nextMap["bathtub"] = product;
+      nextMap["bath_tub"] = product;
+    }
+    setSelectedProductsMap(nextMap);
+  };
+
   // In-3D Product Cycle Arrow Handler (< and >)
   const handleCycleProduct = (category, direction) => {
-    const normCat = category.toLowerCase().replace("wash_basin", "washbasin");
+    const rawCat = (category || "").toLowerCase();
+    const normCat = rawCat.replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
     const productsPool = (allProducts && allProducts.length > 0) ? allProducts : DEFAULT_PRODUCTS;
 
     const categoryProducts = productsPool.filter((p) => {
-      const pCat = p.category.toLowerCase().replace("wash_basin", "washbasin");
+      const pCat = p.category.toLowerCase().replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
       return pCat === normCat;
     });
 
     if (categoryProducts.length === 0) return;
 
     const currentPlacement = activeLayoutData.find((p) => {
-      const pCat = p.category.toLowerCase().replace("wash_basin", "washbasin");
+      const pCat = p.category.toLowerCase().replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
       return pCat === normCat;
     });
 
@@ -365,16 +432,14 @@ export default function App() {
     const nextIndex = (currentIndex + direction + categoryProducts.length) % categoryProducts.length;
     const nextProduct = categoryProducts[nextIndex];
 
-    setSelectedProductDetails(nextProduct);
-    setSelectedProductsMap({ ...selectedProductsMap, [category]: nextProduct, [normCat]: nextProduct });
+    applyProductSelection(nextProduct, category, normCat, rawCat);
   };
 
   // Select catalog product
   const handleSelectCatalogProduct = (product) => {
-    const normCat = product.category.toLowerCase().replace("wash_basin", "washbasin");
-    const nextMap = { ...selectedProductsMap, [product.category]: product, [normCat]: product };
-    setSelectedProductsMap(nextMap);
-    setSelectedProductDetails(product);
+    const pCat = (product.category || "").toLowerCase();
+    const normCat = pCat.replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
+    applyProductSelection(product, product.category, normCat, pCat);
   };
 
   const handleReloadGeneration = () => {
@@ -666,6 +731,7 @@ export default function App() {
 
                   <CatalogBrowser
                     selectedProductsMap={selectedProductsMap}
+                    activeLayoutData={activeLayoutData}
                     onSelectProduct={handleSelectCatalogProduct}
                   />
                 </div>

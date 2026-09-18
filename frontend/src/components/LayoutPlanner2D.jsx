@@ -128,60 +128,56 @@ export function hasIllegalOverlap(proposedState, roomWidthIn, roomDepthIn) {
 }
 
 export function adjustMirrorForWindowOverlap(items, roomWidthIn, roomDepthIn) {
-  if (!items || !items.mirror || !items.window) return items;
+  if (!items || !items.washbasin) return items;
+  const washbasin = items.washbasin;
   const mirror = items.mirror;
   const win = items.window;
 
-  const mirSide = mirror.wallSnapSide || (mirror.y <= 10 ? "top" : mirror.y >= roomDepthIn - 10 ? "bottom" : mirror.x <= 10 ? "left" : "right");
-  const winSide = win.wallSnapSide || (win.y <= 10 ? "top" : win.y >= roomDepthIn - 10 ? "bottom" : win.x <= 10 ? "left" : "right");
+  let updated = { ...items };
 
-  if (mirSide === winSide || mirSide === "top") {
-    const winLeft = win.x;
-    const winRight = win.x + win.w;
-    const mirLeft = mirror.x;
-    const mirRight = mirror.x + mirror.w;
+  // 1. Mirror is ALWAYS centered directly behind/above the washbasin!
+  if (mirror) {
+    const mirX = Math.max(0, Math.min(roomWidthIn - mirror.w, washbasin.x + (washbasin.w - mirror.w) / 2));
+    const mirY = washbasin.wallSnapSide === "bottom" ? Math.max(0, roomDepthIn - mirror.h) : 0;
+    updated.mirror = {
+      ...mirror,
+      x: mirX,
+      y: mirY,
+      wallSnapSide: washbasin.wallSnapSide || "top",
+    };
+  }
 
-    // Check horizontal overlap
-    if (mirLeft < winRight && mirRight > winLeft) {
-      let newMir = { ...mirror };
-      const winMid = winLeft + win.w / 2;
-      const mirMid = mirLeft + mirror.w / 2;
+  // 2. Ensure window NEVER intersects with mirror/washbasin on the same wall!
+  const curMirror = updated.mirror || mirror;
+  if (curMirror && win) {
+    const mirSide = curMirror.wallSnapSide || "top";
+    const winSide = win.wallSnapSide || "top";
 
-      if (mirMid >= winMid) {
-        // Mirror is to the right of window center -> start mirror after window
-        const targetX = winRight + 1;
-        const availableW = roomWidthIn - targetX;
+    if (mirSide === winSide) {
+      const mirLeft = curMirror.x - 2;
+      const mirRight = curMirror.x + curMirror.w + 2;
+      const winLeft = win.x;
+      const winRight = win.x + win.w;
 
-        if (availableW >= (mirror.minW || 14)) {
-          newMir.x = targetX;
-          if (newMir.x + newMir.w > roomWidthIn) {
-            newMir.w = Math.max(mirror.minW || 14, roomWidthIn - newMir.x);
-          }
+      if (winLeft < mirRight && winRight > mirLeft) {
+        let newWinX = win.x;
+        const mirCenter = curMirror.x + curMirror.w / 2;
+        if (mirCenter >= roomWidthIn / 2) {
+          // Mirror is on right half of wall -> shift window to left of mirror
+          newWinX = Math.max(0, mirLeft - win.w - 4);
         } else {
-          // If tight space on right, try putting mirror to left of window
-          if (winLeft - 1 >= (mirror.minW || 14)) {
-            newMir.w = Math.min(mirror.w, winLeft - 1);
-            newMir.x = winLeft - 1 - newMir.w;
-          } else {
-            newMir.w = Math.max(12, availableW);
-            newMir.x = Math.max(0, roomWidthIn - newMir.w);
-          }
+          // Mirror is on left half of wall -> shift window to right of mirror
+          newWinX = Math.min(roomWidthIn - win.w, mirRight + 4);
         }
-      } else {
-        // Mirror is to the left of window center -> keep mirror before window
-        const maxRight = winLeft - 1;
-        if (mirRight > maxRight) {
-          newMir.w = Math.max(mirror.minW || 14, maxRight - newMir.x);
-          if (newMir.x + newMir.w > maxRight) {
-            newMir.x = Math.max(0, maxRight - newMir.w);
-          }
-        }
+        updated.window = {
+          ...win,
+          x: newWinX,
+        };
       }
-      return { ...items, mirror: newMir };
     }
   }
 
-  return items;
+  return updated;
 }
 
 function findEmptySpaceForItem(item, itemKey, existingPlaced, roomWidthIn, roomDepthIn) {
@@ -205,15 +201,16 @@ function findEmptySpaceForItem(item, itemKey, existingPlaced, roomWidthIn, roomD
       candidatePositions.push({ x, y: roomDepthIn - item.h - 4, rot: 180, wallSnapSide: "bottom" });
     }
   } else if (itemKey === "toilet") {
+    // Prioritize bottom-left wall placement clear of top bathtub zone, then bottom wall, then right wall
+    const minYForToilet = existingPlaced.bathtub ? Math.max(34, existingPlaced.bathtub.y + existingPlaced.bathtub.h + 6) : 34;
+    for (let y = roomDepthIn - item.h - 4; y >= minYForToilet; y -= step) {
+      candidatePositions.push({ x: 0, y, rot: 90, wallSnapSide: "left" });
+    }
     for (let x = 4; x <= roomWidthIn - item.w - 4; x += step) {
       candidatePositions.push({ x, y: roomDepthIn - item.h - 4, rot: 180, wallSnapSide: "bottom" });
     }
     for (let y = 4; y <= roomDepthIn - item.h - 4; y += step) {
-      candidatePositions.push({ x: 4, y, rot: 90, wallSnapSide: "left" });
       candidatePositions.push({ x: roomWidthIn - item.w - 4, y, rot: 270, wallSnapSide: "right" });
-    }
-    for (let x = 4; x <= roomWidthIn - item.w - 4; x += step) {
-      candidatePositions.push({ x, y: 4, rot: 0, wallSnapSide: "top" });
     }
   } else {
     for (let y = 0; y <= roomDepthIn - item.h; y += step) {
@@ -240,28 +237,34 @@ function findEmptySpaceForItem(item, itemKey, existingPlaced, roomWidthIn, roomD
 export function autoArrangeLayout(currentItems, roomWidthIn, roomDepthIn, mode = "shower") {
   let itemsCopy = { ...currentItems };
 
-  if (mode === "shower") {
-    delete itemsCopy.bathtub;
-  } else if (mode === "bathtub" && !itemsCopy.bathtub) {
-    itemsCopy.bathtub = {
-      x: 4,
-      y: 4,
-      w: 50,
-      h: 28,
-      heightIn: 22,
-      rot: 0,
-      label: "Bathtub / Shower",
-      color: "#8B5CF6",
-      minW: 30,
-      maxW: 78,
-      minH: 28,
-      maxH: 72,
-      category: "bathtub",
-      wallSnapSide: "top",
-    };
-  }
+  const bathZoneLabel = mode === "shower" ? "Shower Zone" : "Bathtub Zone";
+  const bathZoneColor = mode === "shower" ? "#0EA5E9" : "#8B5CF6";
+  const bathZoneCategory = mode === "shower" ? "shower" : "bathtub";
+  const bathZoneHeight = mode === "shower" ? 84 : 22;
 
-  const placementOrder = ["door", "window", "bathtub", "washbasin", "cabinet", "mirror", "toilet", "towel_bar", "dustbin"];
+  const rawBathW = currentItems.bathtub?.w || 50;
+  const rawBathH = currentItems.bathtub?.h || 28;
+  const bathW = Math.max(rawBathW, rawBathH);
+  const bathH = Math.min(rawBathW, rawBathH);
+
+  itemsCopy.bathtub = {
+    x: 4,
+    y: 4,
+    w: bathW,
+    h: bathH,
+    heightIn: bathZoneHeight,
+    rot: 0,
+    label: bathZoneLabel,
+    color: bathZoneColor,
+    minW: 30,
+    maxW: 78,
+    minH: 28,
+    maxH: 72,
+    category: bathZoneCategory,
+    wallSnapSide: "top",
+  };
+
+  const placementOrder = ["door", "bathtub", "washbasin", "cabinet", "mirror", "window", "toilet", "towel_bar", "dustbin"];
   const placedState = {};
   const unfittedKeys = [];
 
@@ -287,7 +290,7 @@ export function autoArrangeLayout(currentItems, roomWidthIn, roomDepthIn, mode =
     }
 
     if (key === "mirror" && placedState.washbasin) {
-      const mirX = Math.max(0, Math.min(roomWidthIn - item.w, placedState.washbasin.x));
+      const mirX = Math.max(0, Math.min(roomWidthIn - item.w, placedState.washbasin.x + (placedState.washbasin.w - item.w) / 2));
       const mirY = placedState.washbasin.wallSnapSide === "bottom" ? Math.max(0, roomDepthIn - item.h) : 0;
       placedState.mirror = {
         ...item,
@@ -328,7 +331,7 @@ export function autoArrangeLayout(currentItems, roomWidthIn, roomDepthIn, mode =
     warningMsg = `Warning: Room dimensions (${Math.round(roomWidthIn / 12)}' × ${Math.round(roomDepthIn / 12)}') are too small to fit: ${labels}. Please expand room size or adjust layout.`;
   }
 
-  return { arrangedItems: placedState, warningMsg };
+  return { arrangedItems: placedState, warningMsg, fitsSuccessfully: majorUnfitted.length === 0 };
 }
 
 export default function LayoutPlanner2D({
@@ -439,7 +442,7 @@ export default function LayoutPlanner2D({
 
   // Default fixture state dictionary (in inches)
   const defaultItems = {
-    toilet: { x: 4, y: Math.max(30, roomDepthIn - 34), w: 16, h: 26, heightIn: 18, rot: 0, label: "Toilet", color: "#3B82F6", minW: 14, maxW: 24, minH: 18, maxH: 34, category: "toilet" },
+    toilet: { x: 0, y: Math.max(34, roomDepthIn - 34), w: 16, h: 26, heightIn: 18, rot: 90, label: "Toilet", color: "#3B82F6", minW: 14, maxW: 24, minH: 18, maxH: 34, category: "toilet", wallSnapSide: "left" },
     washbasin: { x: Math.max(4, roomWidthIn - 32), y: 6, w: 22, h: 18, heightIn: 32, rot: 0, label: "Washbasin", color: "#10B981", minW: 14, maxW: 42, minH: 12, maxH: 28, category: "washbasin", wallSnapSide: "top" },
     cabinet: { x: Math.max(1, roomWidthIn - 35), y: 3, w: 28, h: 24, heightIn: 28, rot: 0, label: "Vanity Cabinet", color: "#2563EB", minW: 18, maxW: 60, minH: 16, maxH: 36, category: "cabinet", wallSnapSide: "top" },
     bathtub: { x: 4, y: 4, w: 50, h: 28, heightIn: 22, rot: 0, label: "Bathtub / Shower", color: "#8B5CF6", minW: 30, maxW: 78, minH: 28, maxH: 72, category: "bathtub", wallSnapSide: "top" },
@@ -517,8 +520,8 @@ export default function LayoutPlanner2D({
     let newH = currentItem.h;
     let wallSnapSide = currentItem.wallSnapSide || null;
 
-    // Wall Snapping check for wall items as well as washbasin and cabinet
-    const isWallSnappable = currentItem.isWallItem || draggingKey === "door" || draggingKey === "window" || draggingKey === "washbasin" || draggingKey === "cabinet" || draggingKey === "mirror";
+    // Wall Snapping check for wall items as well as washbasin, cabinet, and toilet
+    const isWallSnappable = currentItem.isWallItem || draggingKey === "door" || draggingKey === "window" || draggingKey === "washbasin" || draggingKey === "cabinet" || draggingKey === "mirror" || draggingKey === "toilet";
 
     if (isWallSnappable) {
       const isNarrowWallItem = currentItem.isWallItem || draggingKey === "door" || draggingKey === "window";
@@ -530,22 +533,22 @@ export default function LayoutPlanner2D({
       const minDist = Math.min(distTop, distBottom, distLeft, distRight);
       const span = Math.max(currentItem.w, currentItem.h);
 
-      if (minDist === distTop && distTop < 20) {
+      if (minDist === distTop && (distTop < 20 || draggingKey === "toilet")) {
         newY = 0;
         if (isNarrowWallItem) { newW = span; newH = wallThickness; }
         newRot = 0;
         wallSnapSide = "top";
-      } else if (minDist === distBottom && distBottom < 20) {
+      } else if (minDist === distBottom && (distBottom < 20 || draggingKey === "toilet")) {
         newY = roomDepthIn - (isNarrowWallItem ? wallThickness : currentItem.h);
         if (isNarrowWallItem) { newW = span; newH = wallThickness; }
         newRot = 180;
         wallSnapSide = "bottom";
-      } else if (minDist === distLeft && distLeft < 20) {
+      } else if (minDist === distLeft && (distLeft < 20 || draggingKey === "toilet")) {
         newX = 0;
         if (isNarrowWallItem) { newW = wallThickness; newH = span; }
         newRot = 90;
         wallSnapSide = "left";
-      } else if (minDist === distRight && distRight < 20) {
+      } else if (minDist === distRight && (distRight < 20 || draggingKey === "toilet")) {
         newX = roomWidthIn - (isNarrowWallItem ? wallThickness : currentItem.w);
         if (isNarrowWallItem) { newW = wallThickness; newH = span; }
         newRot = 270;
@@ -556,19 +559,32 @@ export default function LayoutPlanner2D({
     newX = Math.max(0, Math.min(roomWidthIn - newW, newX));
     newY = Math.max(0, Math.min(roomDepthIn - newH, newY));
 
-    if (!currentItem.isWallItem && draggingKey !== "cabinet") {
-      const cX = newX + newW / 2;
-      const cY = newY + newH / 2;
-      const distTop = cY;
-      const distBottom = roomDepthIn - cY;
-      const distLeft = cX;
-      const distRight = roomWidthIn - cX;
-      const minDist = Math.min(distTop, distBottom, distLeft, distRight);
+    if (!currentItem.isWallItem && draggingKey !== "cabinet" && draggingKey !== "toilet") {
+      if (draggingKey === "bathtub") {
+        if (newY <= 14) {
+          newRot = 0;
+          wallSnapSide = "top";
+        } else if (newX <= 14) {
+          newRot = 90;
+          wallSnapSide = "left";
+        } else if (newX >= roomWidthIn - newW - 14) {
+          newRot = 270;
+          wallSnapSide = "right";
+        }
+      } else {
+        const cX = newX + newW / 2;
+        const cY = newY + newH / 2;
+        const distTop = cY;
+        const distBottom = roomDepthIn - cY;
+        const distLeft = cX;
+        const distRight = roomWidthIn - cX;
+        const minDist = Math.min(distTop, distBottom, distLeft, distRight);
 
-      if (minDist === distTop) newRot = 0;
-      else if (minDist === distBottom) newRot = 180;
-      else if (minDist === distLeft) newRot = 90;
-      else if (minDist === distRight) newRot = 270;
+        if (minDist === distTop) newRot = 0;
+        else if (minDist === distBottom) newRot = 180;
+        else if (minDist === distLeft) newRot = 90;
+        else if (minDist === distRight) newRot = 270;
+      }
     }
 
     const proposedState = {
@@ -864,6 +880,7 @@ export default function LayoutPlanner2D({
 
               {/* Wet Zone Overlay */}
               {showWetDryZones && items.bathtub && (() => {
+                const isShowerMode = bathSectionMode === "shower" || items.bathtub.category === "shower";
                 const wetLeftIn = Math.max(0, items.bathtub.x - 6);
                 const wetTopIn = Math.max(0, items.bathtub.y - 6);
                 const wetRightIn = Math.min(roomWidthIn, items.bathtub.x + items.bathtub.w + 12);
@@ -879,20 +896,21 @@ export default function LayoutPlanner2D({
                       top: `${wetTopIn * scale}px`,
                       width: `${wetWidthIn * scale}px`,
                       height: `${wetHeightIn * scale}px`,
-                      backgroundColor: "rgba(14, 165, 233, 0.12)",
-                      border: "1.5px dashed rgba(14, 165, 233, 0.4)",
+                      backgroundColor: isShowerMode ? "rgba(14, 165, 233, 0.14)" : "rgba(139, 92, 246, 0.14)",
+                      border: `1.5px dashed ${isShowerMode ? "#0EA5E9" : "#8B5CF6"}`,
                       borderRadius: "6px",
                       pointerEvents: "none",
                       display: "flex",
                       alignItems: "flex-end",
                       justifyContent: "flex-end",
-                      padding: "4px",
+                      padding: "4px 8px",
                       fontSize: "0.6rem",
-                      color: "#0EA5E9",
-                      fontWeight: "700",
+                      color: isShowerMode ? "#0EA5E9" : "#C4B5FD",
+                      fontWeight: "800",
+                      letterSpacing: "0.5px",
                     }}
                   >
-                    WET ZONE
+                    {isShowerMode ? "SHOWER WET ZONE" : "BATHTUB WET ZONE"}
                   </div>
                 );
               })()}
