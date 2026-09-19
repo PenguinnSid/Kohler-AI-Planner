@@ -3,7 +3,7 @@ import LayoutPlanner2D, { autoArrangeLayout } from "./components/LayoutPlanner2D
 import CatalogBrowser from "./components/CatalogBrowser";
 import LayoutViewer3D from "./components/LayoutViewer3D";
 import BundleResult from "./components/BundleResult";
-import { createDesign, getProducts } from "./api/client";
+import { createDesign, getProducts, allocateDesign } from "./api/client";
 import { FALLBACK_CATALOGUE } from "./fallbackCatalogue";
 
 const GOLD = "#FFFFFF";
@@ -225,6 +225,7 @@ export default function App() {
   const [bathSectionMode, setBathSectionMode] = useState("shower");
   const [cohesionScore, setCohesionScore] = useState(0.8);
   const [generationKey, setGenerationKey] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Floating Overlay States over 3D Scene Background
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
@@ -445,6 +446,83 @@ export default function App() {
   const handleReloadGeneration = () => {
     setGenerationKey((prev) => prev + 1);
     setIsPlannerOpen(false);
+  };
+
+  const handleGenerateAllocation = async () => {
+    setIsGenerating(true);
+    try {
+      // Build category list from current state
+      const categoriesNeeded = ["toilet", "toilet_seat", "washbasin", "faucet"];
+      if (bathSectionMode === "bathtub") {
+        categoriesNeeded.push("bath_tub");
+      }
+
+      // Serialize current 2D layout positions for backend placement context
+      const customLayout = {};
+      if (itemsState) {
+        const posKeys = ["toilet", "washbasin", "cabinet", "bathtub", "window", "door", "mirror"];
+        for (const k of posKeys) {
+          if (itemsState[k]) {
+            const it = itemsState[k];
+            customLayout[k] = { x: it.x, y: it.y, w: it.w, h: it.h, rot: it.rot ?? 0 };
+          }
+        }
+      }
+
+      const requestBody = {
+        room_width_ft: roomWidthFt,
+        room_depth_ft: roomDepthFt,
+        budget_inr: Number(budgetInr) || 0,
+        aesthetic_theme: aestheticTheme || "Minimalist Modern",
+        cohesion_score: cohesionScore,
+        categories_needed: categoriesNeeded,
+        bath_section_mode: bathSectionMode,
+        custom_layout: Object.keys(customLayout).length > 0 ? customLayout : null,
+      };
+
+      const result = await allocateDesign(requestBody);
+
+      // Apply recommended surface themes
+      if (result.recommended_floor_theme) setFloorTheme(result.recommended_floor_theme);
+      if (result.recommended_wall_theme) setWallTheme(result.recommended_wall_theme);
+
+      // Apply each selected product into the product map
+      const pool = (allProducts && allProducts.length > 0) ? allProducts : FALLBACK_CATALOGUE;
+      const nextMap = { ...selectedProductsMap };
+
+      for (const [category, selection] of Object.entries(result.selections || {})) {
+        // Prefer the enriched product from the backend; fall back to local pool
+        const backendProduct = selection.product;
+        const pCat = (category || "").toLowerCase();
+        const normCat = pCat.replace("wash_basin", "washbasin").replace("bath_tub", "bathtub").replace("towel_arm", "towel_bar");
+
+        let product = backendProduct;
+        if (!product) {
+          product = pool.find((p) => p.sku_code === selection.sku_code);
+        }
+        if (!product) continue;
+
+        // Make sure category is set consistently
+        product = { ...product, category: product.category || category };
+
+        const rawCat = product.category.toLowerCase();
+        applyProductSelection(product, category, normCat, rawCat);
+
+        // Also key by sku in map for BundleResult
+        nextMap[category] = product;
+        nextMap[normCat] = product;
+        nextMap[rawCat] = product;
+      }
+
+      setSelectedProductsMap(nextMap);
+
+      // Re-render the 3D scene
+      setGenerationKey((prev) => prev + 1);
+    } catch (err) {
+      console.warn("Generate Design failed:", err);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -683,6 +761,8 @@ export default function App() {
                     onItemsStateChange={setItemsState}
                     onReset={() => setItemsState(null)}
                     onReloadGeneration={handleReloadGeneration}
+                    onGenerateAllocation={handleGenerateAllocation}
+                    isGenerating={isGenerating}
                   />
                 </div>
               </div>
