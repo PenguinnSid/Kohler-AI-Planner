@@ -585,7 +585,7 @@ export default function App() {
 
       {/* Main Container */}
       <main style={{ flex: 1, padding: "0 0 40px 0", width: "100%" }}>
-        
+
         {/* CORE SECTION: IMMERSIVE 3D SCENE BACKGROUND WITH TRANSPARENT FULL-SCREEN OVERLAYS */}
         <section ref={design3DRef} id="design3d" style={{ position: "relative", width: "100%" }}>
 
@@ -601,7 +601,7 @@ export default function App() {
             display: "block",
             overflow: "hidden",
           }}>
-            
+
             {/* 3D Scene Background Rendering Live Active Layout */}
             <ErrorBoundary>
               <LayoutViewer3D

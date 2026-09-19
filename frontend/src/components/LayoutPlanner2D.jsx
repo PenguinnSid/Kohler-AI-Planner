@@ -36,9 +36,9 @@ export function doesInterfereWithDoor(item, door, roomWidthIn, roomDepthIn) {
 
   const side = door.wallSnapSide || (
     door.y <= 10 ? "top" :
-    door.y >= roomDepthIn - 15 ? "bottom" :
-    door.x <= 10 ? "left" :
-    door.x >= roomWidthIn - 15 ? "right" : "bottom"
+      door.y >= roomDepthIn - 15 ? "bottom" :
+        door.x <= 10 ? "left" :
+          door.x >= roomWidthIn - 15 ? "right" : "bottom"
   );
 
   let cx = door.x;
@@ -959,9 +959,9 @@ export default function LayoutPlanner2D({
                     {isDoor && showClearances && (() => {
                       const side = item.wallSnapSide || (
                         item.y <= 10 ? "top" :
-                        item.y >= roomDepthIn - 15 ? "bottom" :
-                        item.x <= 10 ? "left" :
-                        item.x >= roomWidthIn - 15 ? "right" : "bottom"
+                          item.y >= roomDepthIn - 15 ? "bottom" :
+                            item.x <= 10 ? "left" :
+                              item.x >= roomWidthIn - 15 ? "right" : "bottom"
                       );
 
                       let svgLeft = item.x * scale;
