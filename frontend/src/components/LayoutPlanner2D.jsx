@@ -36,9 +36,9 @@ export function doesInterfereWithDoor(item, door, roomWidthIn, roomDepthIn) {
 
   const side = door.wallSnapSide || (
     door.y <= 10 ? "top" :
-    door.y >= roomDepthIn - 15 ? "bottom" :
-    door.x <= 10 ? "left" :
-    door.x >= roomWidthIn - 15 ? "right" : "bottom"
+      door.y >= roomDepthIn - 15 ? "bottom" :
+        door.x <= 10 ? "left" :
+          door.x >= roomWidthIn - 15 ? "right" : "bottom"
   );
 
   let cx = door.x;
@@ -355,6 +355,8 @@ export default function LayoutPlanner2D({
   onItemsStateChange,
   onReset,
   onReloadGeneration,
+  onGenerateAllocation,
+  isGenerating = false,
 }) {
   const roomWidthIn = Math.max(36, roomWidthFt * 12);
   const roomDepthIn = Math.max(36, roomDepthFt * 12);
@@ -959,9 +961,9 @@ export default function LayoutPlanner2D({
                     {isDoor && showClearances && (() => {
                       const side = item.wallSnapSide || (
                         item.y <= 10 ? "top" :
-                        item.y >= roomDepthIn - 15 ? "bottom" :
-                        item.x <= 10 ? "left" :
-                        item.x >= roomWidthIn - 15 ? "right" : "bottom"
+                          item.y >= roomDepthIn - 15 ? "bottom" :
+                            item.x <= 10 ? "left" :
+                              item.x >= roomWidthIn - 15 ? "right" : "bottom"
                       );
 
                       let svgLeft = item.x * scale;
@@ -1489,7 +1491,28 @@ export default function LayoutPlanner2D({
             </div>
           </div>
 
-
+          {/* Generate Design Button */}
+          <button
+            type="button"
+            onClick={() => onGenerateAllocation?.()}
+            disabled={isGenerating}
+            style={{
+              width: "100%",
+              padding: "11px 0",
+              backgroundColor: isGenerating ? "#374151" : "#FFFFFF",
+              color: isGenerating ? "#94A3B8" : "#08090C",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "0.85rem",
+              fontWeight: "800",
+              letterSpacing: "0.3px",
+              cursor: isGenerating ? "not-allowed" : "pointer",
+              transition: "all 0.2s ease",
+              boxShadow: isGenerating ? "none" : "0 2px 10px rgba(255,255,255,0.15)",
+            }}
+          >
+            {isGenerating ? "Generating..." : "Generate Design"}
+          </button>
 
           {/* Feature Toggles */}
           <div style={{
