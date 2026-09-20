@@ -46,9 +46,8 @@ Outputs a comprehensive product bundle matching user requirements from the Kohle
 
 ## Catalogue Reference
 
-https://www.kohler.co.in/content/dam/kohler-com-INDIA/Authored%20Content/PDF/PriceBook_July26.pdf
-
-Extracted Kohler product names, SKUs, pricing, dimensions, and category metadata for major bathroom product lines (toilets, toilet seats, washbasins, faucets, bathtubs, platforms).
+- https://www.studiokohler.com/resources/technical-specifications - 3D Obj Files
+- https://www.kohler.co.in/ - Prices
 
 ## Flow Diagram
 
