@@ -53,6 +53,14 @@ Outputs a comprehensive product bundle matching user requirements from the Kohle
 
 ![Flow Diagram](docs/Flow%20diagram.png)
 
+## Prompts Documentation
+
+- The docs/ folder contains the prompt documentation and details about the AI tools used.
+- It also contains a short presentation showcasing the tech stack and workflow.
+
+- Demo Video: 
+https://drive.google.com/drive/folders/1CwETve5fKgHNUAkR9_tZQxUYY4QVQ0jy?usp=sharing
+
 ## Project Structure
 
 ```text
@@ -102,8 +110,8 @@ kohler-bathroom-designer/
 │   ├── package.json
 │   └── vite.config.js
 ├── docs/
-│   ├── prompts.md
-│   ├── architecture.md
+│   ├── prompts.pdf
+│   ├── presentation.pdf
 │   └── Flow diagram.png
 ├── README.md
 └── .gitignore
