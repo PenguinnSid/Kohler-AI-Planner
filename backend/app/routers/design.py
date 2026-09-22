@@ -1,9 +1,11 @@
+import re
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.product import Product
 from app.schemas.design_request import DesignRequest
+from app.schemas.chat import ChatRequest
 from app.services import catalog_filter, ai_matcher, layout_generator
 
 router = APIRouter(prefix="/design", tags=["design"])
@@ -87,4 +89,46 @@ def allocate_design(request: DesignRequest, db: Session = Depends(get_db)):
         "total_price_inr": bundle.get("total_price_inr", 0),
         "recommended_floor_theme": bundle.get("recommended_floor_theme", "marble"),
         "recommended_wall_theme": bundle.get("recommended_wall_theme", "subway"),
+    }
+
+
+@router.post("/chat")
+def chat_design(request: ChatRequest, db: Session = Depends(get_db)):
+    """Return a structured live product update in response to the design assistant."""
+    message = request.message.lower()
+    theme = request.design.aesthetic_theme
+    if "japanese" in message or "zen" in message:
+        theme = "Japanese Zen"
+    elif "classic" in message or "luxury" in message:
+        theme = "Classic Luxury"
+    elif "minimal" in message or "modern" in message:
+        theme = "Minimalist Modern"
+    updates = {"aesthetic_theme": theme}
+    dimensions = re.search(r"(\d+(?:\.\d+)?)\s*(?:x|×|by)\s*(\d+(?:\.\d+)?)\s*(?:ft|feet|foot)?", message)
+    if dimensions:
+        updates["room_width_ft"] = float(dimensions.group(1))
+        updates["room_depth_ft"] = float(dimensions.group(2))
+    budget = re.search(r"(?:budget(?:\s+of|\s+is|\s*:)?|₹|inr)\s*([\d,]+)", message)
+    if budget:
+        updates["budget_inr"] = float(budget.group(1).replace(",", ""))
+    if "bathtub" in message or "bath tub" in message or "bath zone" in message:
+        updates["bath_section_mode"] = "bathtub"
+    elif "shower" in message:
+        updates["bath_section_mode"] = "shower"
+    design = request.design.model_copy(update=updates)
+    candidates = catalog_filter.filter_candidates(db, design)
+    bundle = ai_matcher.match_bundle(candidates, design)
+    # Material words are explicit surface choices; otherwise use the aesthetic recommendation.
+    floor_theme = next((material for material in ai_matcher.FLOOR_THEME_IDS if f"{material} floor" in message), bundle["recommended_floor_theme"])
+    wall_theme = next((material for material in ai_matcher.WALL_THEME_IDS if f"{material} wall" in message), bundle["recommended_wall_theme"])
+    selections = {}
+    for category, selection in bundle["selections"].items():
+        product = db.query(Product).filter(Product.sku_code == selection["sku_code"]).first()
+        if product:
+            selections[category] = {**selection, "product": ai_matcher.product_payload(product)}
+    updated = [value["sku_code"] for value in selections.values() if value["sku_code"] not in request.selected_skus]
+    return {
+        "message": f"I applied your room brief and refreshed the complete {theme} bundle.",
+        "changes": {"products_updated": updated, "aesthetic_theme": theme, "room_width_ft": design.room_width_ft, "room_depth_ft": design.room_depth_ft, "budget_inr": design.budget_inr, "bath_section_mode": design.bath_section_mode, "floor_theme": floor_theme, "wall_theme": wall_theme, "total_price_inr": bundle["total_price_inr"]},
+        "selections": selections,
     }

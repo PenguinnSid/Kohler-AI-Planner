@@ -1,5 +1,18 @@
 # Kohler-AI-Planner
 
+## AI configuration
+
+Create `backend/.env` (this file is ignored by git) to use OpenRouter:
+
+```env
+OPENROUTER_API_KEY=your_key_here
+# Optional; defaults to openai/gpt-4o-mini
+OPENROUTER_MODEL=openai/gpt-4o-mini
+```
+
+Catalogue selection is locally validated against available products, room footprint and
+budget, so model downtime cannot result in invented SKUs.
+
 ## Problem Statement Description
 ### Track 1: KOHLER AI Bathroom Designer & Planner
 

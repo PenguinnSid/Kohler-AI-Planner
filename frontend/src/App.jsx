@@ -3,7 +3,8 @@ import LayoutPlanner2D, { autoArrangeLayout } from "./components/LayoutPlanner2D
 import CatalogBrowser from "./components/CatalogBrowser";
 import LayoutViewer3D from "./components/LayoutViewer3D";
 import BundleResult from "./components/BundleResult";
-import { createDesign, getProducts, allocateDesign } from "./api/client";
+import { createDesign, getProducts, allocateDesign, chatDesign } from "./api/client";
+import DesignAssistant from "./components/DesignAssistant";
 import { FALLBACK_CATALOGUE } from "./fallbackCatalogue";
 
 const GOLD = "#FFFFFF";
@@ -218,7 +219,7 @@ export default function App() {
   const [roomWidthFt, setRoomWidthFt] = useState(8);
   const [roomDepthFt, setRoomDepthFt] = useState(6);
   const [roomHeightFt, setRoomHeightFt] = useState(9);
-  const [budgetInr, setBudgetInr] = useState("");
+ const [budgetInr, setBudgetInr] = useState("");
   const [aestheticTheme, setAestheticTheme] = useState("Minimalist Modern");
   const [floorTheme, setFloorTheme] = useState("marble");
   const [wallTheme, setWallTheme] = useState("subway");
@@ -226,6 +227,7 @@ export default function App() {
   const [cohesionScore, setCohesionScore] = useState(0.8);
   const [generationKey, setGenerationKey] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isChatting, setIsChatting] = useState(false);
 
   // Floating Overlay States over 3D Scene Background
   const [isPlannerOpen, setIsPlannerOpen] = useState(false);
@@ -523,6 +525,30 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const designRequest = () => ({ room_width_ft: roomWidthFt, room_depth_ft: roomDepthFt, budget_inr: Number(budgetInr) || 0, aesthetic_theme: aestheticTheme, cohesion_score: cohesionScore, categories_needed: ["toilet", "toilet_seat", "washbasin", "faucet", ...(bathSectionMode === "bathtub" ? ["bath_tub"] : [])], bath_section_mode: bathSectionMode });
+  const handleChat = async (message) => {
+    setIsChatting(true);
+    try {
+      const response = await chatDesign({ message, design: designRequest(), selected_skus: Object.values(selectedProductsMap).map((p) => p?.sku_code).filter(Boolean) });
+      const incoming = Object.entries(response.selections || {}).reduce((map, [category, selection]) => {
+        const product = selection.product;
+        if (!product) return map;
+        const normal = category.replace("wash_basin", "washbasin").replace("bath_tub", "bathtub");
+        return { ...map, [category]: product, [normal]: product, [product.category]: product };
+      }, {});
+      setSelectedProductsMap((current) => ({ ...current, ...incoming }));
+      if (response.changes?.aesthetic_theme) setAestheticTheme(response.changes.aesthetic_theme);
+      if (response.changes?.room_width_ft) setRoomWidthFt(response.changes.room_width_ft);
+      if (response.changes?.room_depth_ft) setRoomDepthFt(response.changes.room_depth_ft);
+      if (response.changes?.budget_inr !== undefined) setBudgetInr(response.changes.budget_inr);
+      if (response.changes?.bath_section_mode) setBathSectionMode(response.changes.bath_section_mode);
+      if (response.changes?.floor_theme) setFloorTheme(response.changes.floor_theme);
+      if (response.changes?.wall_theme) setWallTheme(response.changes.wall_theme);
+      setGenerationKey((value) => value + 1);
+      return response;
+    } finally { setIsChatting(false); }
   };
 
   return (
@@ -840,6 +866,7 @@ export default function App() {
       }}>
         Kohler AI Luxury Bathroom Planner • Immersive Real-Time 3D Visualization and Transparent Live Overlays
       </footer>
+      <DesignAssistant onSend={handleChat} isBusy={isChatting} />
     </div>
   );
 }

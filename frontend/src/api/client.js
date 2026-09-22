@@ -24,6 +24,16 @@ export async function allocateDesign(formData) {
   return response.json();
 }
 
+export async function chatDesign(payload) {
+  const response = await fetch(`${BASE_URL}/design/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Chat request failed: ${response.status}`);
+  return response.json();
+}
+
 export async function getProducts(category) {
   const url = new URL(`${BASE_URL}/products/`);
   if (category) url.searchParams.set("category", category);
