@@ -540,7 +540,7 @@ export default function App() {
       }, {});
       setSelectedProductsMap((current) => ({ ...current, ...incoming }));
       if (response.changes?.aesthetic_theme) setAestheticTheme(response.changes.aesthetic_theme);
-      if (response.changes?.room_width_ft) setRoomWidthFt(response.changes.room_width_ft);
+           if (response.changes?.room_width_ft) setRoomWidthFt(response.changes.room_width_ft);
       if (response.changes?.room_depth_ft) setRoomDepthFt(response.changes.room_depth_ft);
       if (response.changes?.budget_inr !== undefined) setBudgetInr(response.changes.budget_inr);
       if (response.changes?.bath_section_mode) setBathSectionMode(response.changes.bath_section_mode);
