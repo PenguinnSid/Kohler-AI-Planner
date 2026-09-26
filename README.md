@@ -1,24 +1,4 @@
-# Kohler-AI-Planner
-
-## AI configuration
-
-Create `backend/.env` (this file is ignored by git) to use OpenRouter:
-
-```env
-OPENROUTER_API_KEY=your_key_here
-# Optional; defaults to openai/gpt-4o-mini
-OPENROUTER_MODEL=openai/gpt-4o-mini
-```
-
-Catalogue selection is locally validated against available products, room footprint and
-budget, so model downtime cannot result in invented SKUs.
-
-## Problem Statement Description
-### Track 1: KOHLER AI Bathroom Designer & Planner
-
-Objective: Build an interactive AI design assistant that takes a customer's constraints and automates personalized product bundle recommendations.
-Key Inputs: Bathroom dimensions (ft x ft / layout or image), budget limits, aesthetic themes (e.g., Minimalist Modern, Classic Luxury, Japanese Zen), and device catalog specifications.
-Expected Outcome: An intelligent recommendation engine that outputs optimized product combinations (faucets, smart toilets, thermostatic showers, vanities) fitting exact physical space and budget parameters. Provides both an interactive 2D floorplan painter and a full 3D room representation of the bathroom layout with selected Kohler products.
+# 3D-AI-Bathroom-Visualizer
 
 ## Project Description
 Interactive AI-based bathroom design assistant and 3D visualizer.
@@ -29,13 +9,13 @@ Accepts the following input parameters:
 - Aesthetic Style / Theme (Minimalist Modern, Classic Luxury, Japanese Zen)
 - Interactive 2D Custom Fixture Positioning (Optional)
 
-Outputs a comprehensive product bundle matching user requirements from the Kohler catalogue, alongside an interactive 2D room floorplan painter and a full 3D bathroom walkthrough environment.
+Outputs a comprehensive product bundle matching user requirements from a catalogue, alongside an interactive 2D room floorplan painter and a full 3D bathroom walkthrough environment.
 
 ## Features
 
 #### Input-Based AI Design Generation
 - User enters room dimensions, budget limits, and aesthetic theme.
-- Recommendation pipeline filters Kohler catalogue to generate matching product bundles (toilets, seats, washbasins, faucets, bathtubs) optimized for room size and budget parameters.
+- Recommendation pipeline filters a catalogue to generate matching product bundles (toilets, seats, washbasins, faucets, bathtubs) optimized for room size and budget parameters.
 
 #### Interactive 2D Room & Floorplan Painter
 - Interactive drag-and-drop 2D room layout editor (`LayoutPlanner2D.jsx`).
@@ -47,13 +27,13 @@ Outputs a comprehensive product bundle matching user requirements from the Kohle
 #### Interactive 3D Bathroom Visualizer & Fixture Inspector
 - Full 3D room environment built with Three.js / React Three Fiber (`LayoutViewer3D.jsx`).
 - Dynamic theme-matched floor and wall textures (Carrara Marble tiles for Classic Luxury, Cedar wood slats for Japanese Zen, Smooth Pure White for Minimalist Modern).
-- Renders high-detail 3D Kohler OBJ models (Veil, ModernLife, Span, Reach) and procedural CAD fixtures.
+- Renders high-detail 3D OBJ models (Veil, ModernLife, Span, Reach) and procedural CAD fixtures.
 - Fixture Inspection View: Clicking any catalogue fixture focuses the camera on the front of the item from inside the room while locking orbit controls.
 - Symmetric Trajectory Retracing: Clicking the bottom-right transparent `Reset View` button smoothly retraces the exact camera trajectory backward to your previous viewing angle.
 - Interactive Pulsating Hotspots & Callout Cards: Floating spec cards with product names, dimensions, pricing in INR, and quiet-close seat notes.
 
 #### Selective Catalogue Browsing & Product Matching
-- Manually browse, search, and select Kohler products across categories.
+- Manually browse, search, and select bathroom products across categories.
 - Auto-complements items into complete bundles and updates 2D and 3D room representations.
 - Product similarity engine recommending alternative fixtures matching theme and budget.
 
@@ -71,13 +51,10 @@ Outputs a comprehensive product bundle matching user requirements from the Kohle
 - The docs/ folder contains the prompt documentation and details about the AI tools used.
 - It also contains a short presentation showcasing the tech stack and workflow.
 
-- Demo Video: 
-https://drive.google.com/drive/folders/1CwETve5fKgHNUAkR9_tZQxUYY4QVQ0jy?usp=sharing
-
 ## Project Structure
 
 ```text
-kohler-bathroom-designer/
+3D-AI-Bathroom-Visualizer/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py
@@ -140,10 +117,14 @@ cd backend
 pip install -r requirements.txt
 ```
 
-#### API Configuration
-Add your Google Gemini API key to the `.env` file inside the `backend` directory:
-```bash
-GOOGLE_API_KEY=your_api_key_here
+#### API configuration
+
+Create `backend/.env` to use OpenRouter:
+
+```env
+OPENROUTER_API_KEY=your_key_here
+# Optional; defaults to openai/gpt-4o-mini
+OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
 #### Running the Backend Server
